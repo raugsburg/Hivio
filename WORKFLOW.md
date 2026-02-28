@@ -22,6 +22,7 @@ Save the annotated summary as sessions/YYYY-MM-DD-story-name-summary.md
 Commit both files to your feature branch
 Periodically go to Settings > Privacy > Export Data on claude.ai for your raw backup
 
+---------------------------------------------------------------------
 Standard Session Summary Prompt: 
 Summarize this coding session using the following structure:
 SESSION OVERVIEW: Date, user story being worked on, team member name, role this rotation.
@@ -31,6 +32,7 @@ WHAT I CHANGED MANUALLY: List anything I edited, deleted, or rewrote after you g
 WHAT FAILED OR WAS REJECTED: List any prompts where the output was wrong, incomplete, or unusable. Describe what went wrong.
 WHAT IS STILL UNFINISHED: List any acceptance criteria or features that are not yet complete after this session.
 DECISIONS MADE: List any architecture, design, or implementation decisions made during this session and the reasoning behind each
+----------------------------------------------------------------------
 
 When a Story Is Complete:
 Open a pull request on GitHub
