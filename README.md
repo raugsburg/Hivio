@@ -10,12 +10,6 @@ Database: Firebase / SQL
 Authentication: JWT / Firebase Auth
 AI Development Tools: Claude, GitHub Copilot
 
-Repository Structure
-hivio/CHANGELOG.md        - Record of all merged stories
-CONTEXT.md          - Full project context and data model
-WORKFLOW.md         - Team build process and session documentation standards
-sessions/           - AI session exports and annotated summaries
-
 Team Future Hires:
 Shady
 Abdikadir
