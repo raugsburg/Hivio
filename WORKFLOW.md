@@ -42,7 +42,7 @@ UX and Integration verifies visual correctness and confirms nothing is broken
 All pass → merge PR → mark story Done in Smartsheet
 
 Add entry to CHANGELOG.md using this format example:
-## [Date] - US-001: Create Student Account
+#[Date] - US-001: Create Student Account
 User Story: (The original user story text)
 What Changed: (Brief description of what was built or modified)
 AI Tool Used: (Claude, Codex, github, etc. Include version if known)
@@ -61,14 +61,6 @@ Data model changes:
 Document what changed, what it was before, what it is now, and why
 Update CONTEXT.md on main immediately
 
-End of Each Rotation
-Every team member posts a Role Rotation Log to Google Sites answering these five questions in 3-5 sentences each:
-What was your role this rotation?
-What specific work did you complete?
-What AI tools did you use and how?
-What did you have to fix or override?
-What would you do differently?
-
 Per Gate Portfolio Requirements
 Add an AI Usage Section to Google Sites containing:
 Link to sessions/ folder on GitHub
@@ -76,6 +68,14 @@ Total session count broken down by user story
 Examples of prompts that worked and prompts that failed
 Summary of all manual edits and why they were necessary
 Lessons learned about working with AI tools
+
+End of Each Rotation
+Every team member posts a Role Rotation Log to Google Sites answering these five questions in 3-5 sentences each:
+What was your role this rotation?
+What specific work did you complete?
+What AI tools did you use and how?
+What did you have to fix or override?
+What would you do differently?
 
 Mistakes that will hurt your grade:
 Mistake                                                Why it Hurts
