@@ -8,7 +8,7 @@ Frontend: React
 Backend: Node.js
 Database: Firebase / SQL
 Authentication: JWT / Firebase Auth
-AI Development Tools: Claude, GitHub Copilot
+AI Development Tools: Claude, GitHub Copilot, ChatGPT
 
 Team Future Hires:
 Shady
