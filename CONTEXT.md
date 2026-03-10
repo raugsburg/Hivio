@@ -6,9 +6,21 @@ React Frontend, Node.js Backend, Firebase/SQL Database, JWT Security, Claude/Git
 
 User Stories:
 User Onboarding & Security
-As a student, I want to create an account so my data is saved and secure. Acceptance Criteria: "Given a new user is on the registration page. When they enter valid credentials and sign up. Then an account is created and the user is redirected to the dashboard."
-As a student, I want a secure login so my information is protected. Acceptance Criteria: "Given a registered user exists. When they enter correct login credentials. Then they are authenticated and granted access."
-As a student, I want to set-up a profile so my dashboard is personalized. Acceptance Criteria: "Given the profile setup page is open. When the user enters or edits profile information and saves. Then the updated information is stored and displayed on future logins."
+1. As a student, I want to create an account so my data is saved and secure. Acceptance Criteria: "Given a new user is on the registration page. When they enter valid credentials and sign up. Then an account is created and the user is redirected to the dashboard."
+2. As a student, I want a secure login so my information is protected. Acceptance Criteria: "Given a registered user exists. When they enter correct login credentials. Then they are authenticated and granted access."
+3. As a student, I want to set-up a profile so my dashboard is personalized. Acceptance Criteria: "Given the profile setup page is open. When the user enters or edits profile information and saves. Then the updated information is stored and displayed on future logins."
+
+Resume Setup:
+
+Application Creation:
+
+Application Management:
+
+User Interface Experience:
+
+Visual Identity:
+
+Analytics Dashboard:
 
 Data Model:
 A Student has many Job Applications.
