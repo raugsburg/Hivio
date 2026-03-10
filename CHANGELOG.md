@@ -1,4 +1,4 @@
-# 03-10-2026 - US-001: Create Student Account
+# 2026-03-10 - US-001: Create Student Account
 **User Story:** As a student, I want to create an account so my data is saved and secure.
 **What Changed:** Built registration screen with client-side validation, bcrypt password hashing, login screen with hash verification, placeholder dashboard, and iPhone-sized phone frame wrapper. Also has both a login/registration authenitcator for when the wrong information is entered. For example not entering an email with the correct logic (no @ or .com/.edu).
 **AI Tool Used:** GitHub Copilot (Copilot Space) and ChatGPT 5.0
