@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import bcrypt from 'bcryptjs';
-import './Register.css';
 
 function Register({ onRegistrationComplete, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -14,7 +13,6 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
   function handleChange(e) {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -22,36 +20,28 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
 
   function validate() {
     const newErrors = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
-
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
     }
-
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-
     return newErrors;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     const validationErrors = validate();
-
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
@@ -62,87 +52,86 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
 
     const userData = {
       name: formData.name,
-      email: formData.email,
+      email: formData.email.toLowerCase(),
       password: hashedPassword,
       createdAt: new Date().toISOString()
     };
 
     localStorage.setItem('hivio_user', JSON.stringify(userData));
-    console.log('Account created:', { ...userData, password: '[HASHED]' });
-
     onRegistrationComplete(userData);
   }
 
   return (
-    <div className="register-container">
-      <div className="register-header">
-        <h1>Hivio</h1>
-        <p>Track your job search, all in one place.</p>
+    <div className="flex flex-col min-h-screen px-8 py-10 bg-white relative">
+      <div className="flex flex-col mb-10 mt-16">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Create Account</h1>
+        <p className="text-slate-500 font-medium leading-relaxed">Join Hivio and get your job search organized today.</p>
       </div>
 
-      <form className="register-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="name">Full Name</label>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Full Name</label>
           <input
             type="text"
-            id="name"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            placeholder="Enter your full name"
+            placeholder="Alex Carter"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
-          {errors.name && <span className="error">{errors.name}</span>}
+          {errors.name && <span className="text-red-500 text-xs mt-1 ml-1">{errors.name}</span>}
         </div>
 
-        <div className="form-group">
-          <label htmlFor="email">Email</label>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
           <input
             type="email"
-            id="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="Enter your email"
+            placeholder="student@university.edu"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
-          {errors.email && <span className="error">{errors.email}</span>}
+          {errors.email && <span className="text-red-500 text-xs mt-1 ml-1">{errors.email}</span>}
         </div>
 
-        <div className="form-group">
-          <label htmlFor="password">Password</label>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Password</label>
           <input
             type="password"
-            id="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             placeholder="At least 8 characters"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
-          {errors.password && <span className="error">{errors.password}</span>}
+          {errors.password && <span className="text-red-500 text-xs mt-1 ml-1">{errors.password}</span>}
         </div>
 
-        <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Confirm Password</label>
           <input
             type="password"
-            id="confirmPassword"
             name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
             placeholder="Re-enter your password"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
-          {errors.confirmPassword && (
-            <span className="error">{errors.confirmPassword}</span>
-          )}
+          {errors.confirmPassword && <span className="text-red-500 text-xs mt-1 ml-1">{errors.confirmPassword}</span>}
         </div>
 
-        <button type="submit" className="register-button">
+        <button
+          type="submit"
+          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-6"
+        >
           Create Account
         </button>
       </form>
 
-      <p className="login-link">
+      <p className="text-center text-slate-500 text-sm mt-10 font-medium">
         Already have an account?{' '}
-        <button type="button" className="link-button" onClick={onSwitchToLogin}>
+        <button type="button" onClick={onSwitchToLogin} className="text-[#2C6E91] font-semibold hover:underline">
           Sign in
         </button>
       </p>
