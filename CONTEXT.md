@@ -10,17 +10,90 @@ User Onboarding & Security
 2. As a student, I want a secure login so my information is protected. Acceptance Criteria: "Given a registered user exists. When they enter correct login credentials. Then they are authenticated and granted access."
 3. As a student, I want to set-up a profile so my dashboard is personalized. Acceptance Criteria: "Given the profile setup page is open. When the user enters or edits profile information and saves. Then the updated information is stored and displayed on future logins."
 
-Resume Setup:
+EPIC: Application Creation
 
-Application Creation:
+As a student, I want to add a job application that I can track and organize my job search.
+Given the job application form is displayed.
+When the user enters required job details (company, position, date) and saves.
+Then the application is stored and displayed on the dashboard.
 
-Application Management:
+As a student, I want to link resumes to applications so that I can view performance of each resume.
+Given the job application form includes a resume selection option.
+When the user selects a resume and saves the application.
+Then the selected resume is linked to that application.
 
-User Interface Experience:
+As a student, I want to edit details on my application so my record is up-to-date.
+Given an existing job application record.
+When the user updates details and saves.
+Then the updated information replaces the previous data and is displayed on the dashboard.
 
-Visual Identity:
+EPIC: Application Management
 
-Analytics Dashboard:
+As a student, I want to update my application status so I can track the progress.
+Given an existing job application.
+When the user selects a new status (Applied, Interview, Rejected).
+Then the updated status is saved and displayed on the dashboard.
+
+As a student, I want to add notes to my applications so I can reference important details.
+Given an existing job application.
+When the user enters notes and saves.
+Then the notes are stored and viewable under that application.
+
+As a student, I want to archive or delete old applications so my dashboard stays organized.
+Given an existing job application.
+When the user selects archive/delete.
+Then the application is deleted or moved to the archive list and removed from active view.
+
+EPIC: User Interface Experience
+
+As a student, I want a light mode and dark mode option so I can choose what feels better.
+Given the user is in the settings menu.
+When the user selects light or dark mode.
+Then the selected theme is applied to the entire app across all tabs.
+
+As a student, I want little visual clutter so I can focus on managing my applications efficiently.
+Given the user is on any tab (dashboard, calendar, etc).
+When the page loads and displays.
+Then the essential information is displayed and things like pop ups or random buttons are minimized.
+
+As a student, I want applications to be visually distinct depending on their status so I can quickly assess my progress.
+Given applications are displayed on the dashboard.
+When all the different applications are shown.
+Then the status of applications is visually identifiable and represented with a consistent indicator.
+
+EPIC: Visual Identity
+
+As a student, I want a clean and modern interface so that the app feels professional.
+Given the user opens the app.
+When the dashboard or other tabs load.
+Then the layout and spacing follow a consistent modern design.
+
+As a student, I want consistent colors and style around the app so I don't get confused or overwhelmed.
+Given the user is navigating between different pages.
+When viewing links, buttons, alerts, etc.
+Then the color palette and style follows the system design consistently.
+
+As a student, I want the text to have contrast with the background so it is readable and less stressful for my eyes.
+Given the user is on any tab of the app.
+When text appears anywhere on the screen.
+Then the text color is contrasting with the background and isn't hard to read.
+
+EPIC: Analytics Dashboard
+
+As a student, I want to see a summary of my total applications so that I can track my overall progress.
+Given the user opens the analytics dashboard.
+When viewing the dashboard.
+Then the total number of applications are displayed.
+
+As a student, I want to see a breakdown of my application outcomes so that I can understand my overall results.
+Given the user opens the analytics dashboard.
+When applications are marked with the different statuses.
+Then system displays the different applications based on each's status.
+
+As a student, I want to compare the different statuses by resume so that I can identify which resume performs better.
+Given the user has multiple resumes linked to applications.
+When the analytics dashboard is opened.
+Then the system displays the number of (interview, accepted, rejected) for each resume
 
 Data Model:
 A Student has many Job Applications.
