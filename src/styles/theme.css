@@ -1,0 +1,9 @@
+:root {
+  --color-brand: #2C6E91;
+  --color-brand-light: #3D8AB0;
+  --color-brand-dark: #1F5170;
+  --color-bg: #F7F9FC;
+  --color-bg-outer: #e8edf2;
+  --radius-card: 1rem;
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
