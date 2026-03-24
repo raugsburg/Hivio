@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import PhoneFrame from './components/PhoneFrame';
 import Register from './components/auth/Register';
 import Login from './components/auth/Login';
+import ForgotPassword from './components/auth/ForgotPassword';
 import ProfileSetup from './components/onboarding/ProfileSetup';
 import Dashboard from './components/home/Dashboard';
 import Applications from './components/home/Applications';
@@ -52,9 +53,15 @@ function App() {
       case 'analytics':
         return <Analytics user={currentUser} />;
       case 'settings':
-        return <Settings user={currentUser} onLogout={handleLogout} />;
+        return(
+          <Settings 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            onUpdateUser={setCurrentUser}
+            />
+        );
       default:
-        return <Dashboard user={currentUser} />;
+        return <Dashboard user={currentUser} onTabChange={setActiveTab} />;
     }
   }
 
@@ -71,7 +78,7 @@ function App() {
     if (screen === 'app' && currentUser) {
       return (
         <div className="flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto">
+          <div id="app-scroll-container" className="flex-1 overflow-y-auto">
             {renderActiveTab()}
           </div>
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
@@ -88,10 +95,19 @@ function App() {
       );
     }
 
+    if (screen === 'forgotPassword') {
+  return (
+    <ForgotPassword
+      onSwitchToLogin={() => setScreen('login')}
+    />
+  );
+}
+
     return (
       <Login
         onLogin={handleLogin}
         onSwitchToRegister={() => setScreen('register')}
+        onSwitchToForgotPassword={() => setScreen('forgotPassword')}
       />
     );
   }

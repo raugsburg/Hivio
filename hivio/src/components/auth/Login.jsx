@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import bcrypt from 'bcryptjs';
 
-function Login({ onLogin, onSwitchToRegister }) {
+function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+
+  const isDev =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.app.github.dev');
+  
+  const DEV_EMAIL = 'test@hivio.local';
+  const DEV_PASSWORD = '1';
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -16,6 +24,28 @@ function Login({ onLogin, onSwitchToRegister }) {
 
     if (!formData.email.trim() || !formData.password) {
       setError('Please enter both email and password');
+      return;
+    }
+
+    // Localhost-only fallback account for easy testing
+    if (
+      isDev &&
+      formData.email.trim().toLowerCase() === DEV_EMAIL.toLowerCase() &&
+      formData.password === DEV_PASSWORD
+    ) {
+      const devUser = {
+        email: DEV_EMAIL,
+        password: 'DEV_LOCALHOST_BYPASS', 
+        profile: {
+          firstName: 'Test',
+          lastName: 'User',
+        },
+      };
+
+      
+      localStorage.setItem('hivio_user', JSON.stringify(devUser));
+
+      onLogin(devUser);
       return;
     }
 
@@ -74,6 +104,15 @@ function Login({ onLogin, onSwitchToRegister }) {
             placeholder="••••••••"
             className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
+        </div>
+        <div className="text-left">
+          <button
+            type="button"
+            onClick={onSwitchToForgotPassword}
+            className="text-[#2C6E91] font-semibold hover:underline"
+          >
+            Forgot Password?
+          </button>
         </div>
 
         {error && (
