@@ -463,7 +463,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
             name="location"
             value={form.location}
             onChange={handleBasicChange}
-            placeholder="e.g. San Francisco, CA or Remote"
+            placeholder="e.g. Minneapolis, MN or Remote"
             className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
           />
         </div>

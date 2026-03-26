@@ -1,4 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
+import AutocompleteInput from '../common/Autocompleteinput';
+import { MN_SCHOOLS } from '../../data/schools-mn';
+import { COMMON_MAJORS } from '../../data/majors';
+import { PREFERRED_LOCATIONS } from '../../data/locations';
 
 const careerInterests = [
   'Software Engineering', 'Product Management', 'Data Science',
@@ -60,10 +64,15 @@ const dashboardWidgets = [
   },
 ];
 
+function normalizeText(s) {
+  return (s || '').trim().replace(/\s+/g, ' ');
+}
+
 function ProfileSetup({ user, onProfileComplete }) {
   const [step, setStep] = useState(1);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const fileInputRef = useRef(null);
+
   const [profile, setProfile] = useState({
     school: '',
     major: '',
@@ -71,6 +80,7 @@ function ProfileSetup({ user, onProfileComplete }) {
     interests: [],
     location: ''
   });
+
   const [widgets, setWidgets] = useState({
     statusBreakdown: true,
     weeklyActivity: true,
@@ -78,7 +88,15 @@ function ProfileSetup({ user, onProfileComplete }) {
     upcomingTasks: true,
     recentApps: true,
   });
+
   const [errors, setErrors] = useState({});
+
+  const gradYearOptions = useMemo(() => {
+    const start = new Date().getFullYear(); // 2026 right now
+    const years = [];
+    for (let i = 0; i < 9; i++) years.push(String(start + i));
+    return years;
+  }, []);
 
   function handlePhotoClick() {
     fileInputRef.current.click();
@@ -114,13 +132,9 @@ function ProfileSetup({ user, onProfileComplete }) {
 
   function validateStep1() {
     const newErrors = {};
-    if (!profile.school.trim()) newErrors.school = 'School is required';
-    if (!profile.major.trim()) newErrors.major = 'Major is required';
-    if (!profile.gradYear.trim()) {
-      newErrors.gradYear = 'Graduation year is required';
-    } else if (!/^\d{4}$/.test(profile.gradYear)) {
-      newErrors.gradYear = 'Enter a valid year (e.g. 2026)';
-    }
+    if (!normalizeText(profile.school)) newErrors.school = 'School is required';
+    if (!normalizeText(profile.major)) newErrors.major = 'Major is required';
+    if (!profile.gradYear) newErrors.gradYear = 'Graduation year is required';
     return newErrors;
   }
 
@@ -138,12 +152,22 @@ function ProfileSetup({ user, onProfileComplete }) {
     const stored = localStorage.getItem('hivio_user');
     if (stored) {
       const userData = JSON.parse(stored);
+
+      const normalizedProfile = {
+        ...profile,
+        school: normalizeText(profile.school),
+        major: normalizeText(profile.major),
+        gradYear: String(profile.gradYear),
+        location: normalizeText(profile.location),
+      };
+
       const updatedUser = {
         ...userData,
-        profile,
+        profile: normalizedProfile,
         avatarUrl: avatarPreview || null,
         dashboardWidgets: widgets
       };
+
       localStorage.setItem('hivio_user', JSON.stringify(updatedUser));
       onProfileComplete(updatedUser);
     }
@@ -196,39 +220,49 @@ function ProfileSetup({ user, onProfileComplete }) {
           <p className="text-slate-500 font-medium mb-8">Tell us about your academic background.</p>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">School / University</label>
-              <input
-                type="text"
-                value={profile.school}
-                onChange={e => setProfile({ ...profile, school: e.target.value })}
-                placeholder="e.g. University of Augsburg"
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
-              {errors.school && <span className="text-red-500 text-xs mt-1 ml-1">{errors.school}</span>}
-            </div>
+            <AutocompleteInput
+              label="School / University"
+              value={profile.school}
+              onChange={(v) => {
+                setProfile((p) => ({ ...p, school: v }));
+                if (errors.school) setErrors((e) => ({ ...e, school: '' }));
+              }}
+              options={MN_SCHOOLS}
+              placeholder="Start typing your school (Minnesota list)..."
+              required
+              error={errors.school}
+            />
+
+            <AutocompleteInput
+              label="Major / Field of Study"
+              value={profile.major}
+              onChange={(v) => {
+                setProfile((p) => ({ ...p, major: v }));
+                if (errors.major) setErrors((e) => ({ ...e, major: '' }));
+              }}
+              options={COMMON_MAJORS}
+              placeholder="Start typing your major..."
+              required
+              error={errors.major}
+            />
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Major / Field of Study</label>
-              <input
-                type="text"
-                value={profile.major}
-                onChange={e => setProfile({ ...profile, major: e.target.value })}
-                placeholder="e.g. Computer Science"
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
-              {errors.major && <span className="text-red-500 text-xs mt-1 ml-1">{errors.major}</span>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Graduation Year</label>
-              <input
-                type="text"
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                Graduation Year *
+              </label>
+              <select
                 value={profile.gradYear}
-                onChange={e => setProfile({ ...profile, gradYear: e.target.value })}
-                placeholder="e.g. 2026"
+                onChange={(e) => {
+                  setProfile((p) => ({ ...p, gradYear: e.target.value }));
+                  if (errors.gradYear) setErrors((er) => ({ ...er, gradYear: '' }));
+                }}
                 className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
+              >
+                <option value="" disabled>Select year</option>
+                {gradYearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
               {errors.gradYear && <span className="text-red-500 text-xs mt-1 ml-1">{errors.gradYear}</span>}
             </div>
           </div>
@@ -276,13 +310,16 @@ function ProfileSetup({ user, onProfileComplete }) {
 
           {/* Preferred Location */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Preferred Location</label>
-            <input
-              type="text"
+            <AutocompleteInput
+              label="Preferred Location"
               value={profile.location}
-              onChange={e => setProfile({ ...profile, location: e.target.value })}
-              placeholder="e.g. San Francisco, CA or Remote"
-              className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+              onChange={(v) => {
+                setProfile({ ...profile, location: v });
+                if (errors.location) setErrors((er) => ({ ...er, location: '' }));
+              }}
+              options={PREFERRED_LOCATIONS}
+              placeholder="e.g. Minneapolis, MN or Remote"
+              error={errors.location}
             />
           </div>
 

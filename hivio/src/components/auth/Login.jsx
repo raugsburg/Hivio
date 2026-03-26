@@ -9,7 +9,7 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
     window.location.hostname.endsWith('.app.github.dev');
-  
+
   const DEV_EMAIL = 'test@hivio.local';
   const DEV_PASSWORD = '1';
 
@@ -27,7 +27,6 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
       return;
     }
 
-    // Localhost-only fallback account for easy testing
     if (
       isDev &&
       formData.email.trim().toLowerCase() === DEV_EMAIL.toLowerCase() &&
@@ -35,16 +34,10 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
     ) {
       const devUser = {
         email: DEV_EMAIL,
-        password: 'DEV_LOCALHOST_BYPASS', 
-        profile: {
-          firstName: 'Test',
-          lastName: 'User',
-        },
+        password: 'DEV_LOCALHOST_BYPASS',
+        profile: { firstName: 'Test', lastName: 'User' },
       };
-
-      
       localStorage.setItem('hivio_user', JSON.stringify(devUser));
-
       onLogin(devUser);
       return;
     }
@@ -71,18 +64,50 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen px-8 py-12 justify-center bg-white">
-      <div className="flex flex-col items-center mb-12">
-        <div className="w-16 h-16 bg-[#2C6E91] text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-          </svg>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Hivio</h1>
-        <p className="text-slate-500 text-center font-medium">Your calm companion for the job search.</p>
+    <div className="flex flex-col min-h-screen px-8 pt-16 pb-8 justify-start bg-white">
+      {/* Logo + branding */}
+      <div className="flex flex-col items-center mb-8">
+        <svg
+          viewBox="0 0 64 64"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-28 h-28 mb-3"
+        >
+          <polygon
+            points="32,10 46,18 46,34 32,42 18,34 18,18"
+            fill="none"
+            stroke="#2C6E91"
+            strokeWidth="2"
+          />
+          <circle cx="32" cy="26" r="4" fill="#2C6E91" />
+          <circle cx="32" cy="10" r="3" fill="#2C6E91" opacity="0.7" />
+          <circle cx="46" cy="18" r="3" fill="#2C6E91" opacity="0.7" />
+          <circle cx="46" cy="34" r="3" fill="#2C6E91" opacity="0.7" />
+          <circle cx="32" cy="42" r="3" fill="#2C6E91" opacity="0.7" />
+          <circle cx="18" cy="34" r="3" fill="#2C6E91" opacity="0.7" />
+          <circle cx="18" cy="18" r="3" fill="#2C6E91" opacity="0.7" />
+          <line x1="32" y1="26" x2="32" y2="10" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <line x1="32" y1="26" x2="46" y2="18" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <line x1="32" y1="26" x2="46" y2="34" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <line x1="32" y1="26" x2="32" y2="42" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <line x1="32" y1="26" x2="18" y2="34" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <line x1="32" y1="26" x2="18" y2="18" stroke="#2C6E91" strokeWidth="1.2" opacity="0.5" />
+          <circle cx="32" cy="52" r="2.5" fill="#2C6E91" opacity="0.4" />
+          <circle cx="54" cy="44" r="2.5" fill="#2C6E91" opacity="0.4" />
+          <circle cx="10" cy="44" r="2.5" fill="#2C6E91" opacity="0.4" />
+          <line x1="32" y1="42" x2="32" y2="52" stroke="#2C6E91" strokeWidth="1" opacity="0.3" />
+          <line x1="46" y1="34" x2="54" y2="44" stroke="#2C6E91" strokeWidth="1" opacity="0.3" />
+          <line x1="18" y1="34" x2="10" y2="44" stroke="#2C6E91" strokeWidth="1" opacity="0.3" />
+        </svg>
+
+        <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-1">Hivio</h1>
+        <p className="text-slate-500 text-center font-medium text-sm">
+          Turning applications into interviews
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
           <input
@@ -109,7 +134,7 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
           <button
             type="button"
             onClick={onSwitchToForgotPassword}
-            className="text-[#2C6E91] font-semibold hover:underline"
+            className="text-[#2C6E91] font-semibold hover:underline text-sm"
           >
             Forgot Password?
           </button>
@@ -123,15 +148,19 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
 
         <button
           type="submit"
-          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-4"
+          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-2"
         >
           Sign In
         </button>
       </form>
 
-      <p className="text-center text-slate-500 text-sm mt-10 font-medium">
+      <p className="text-center text-slate-500 text-sm mt-6 font-medium">
         New to Hivio?{' '}
-        <button type="button" onClick={onSwitchToRegister} className="text-[#2C6E91] font-semibold hover:underline">
+        <button
+          type="button"
+          onClick={onSwitchToRegister}
+          className="text-[#2C6E91] font-semibold hover:underline"
+        >
           Create an account
         </button>
       </p>
