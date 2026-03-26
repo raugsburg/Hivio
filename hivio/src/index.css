@@ -23,3 +23,40 @@ code {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+/* --- Dark mode autofill fix (Chrome/Safari) --- */
+html.dark input:-webkit-autofill,
+html.dark textarea:-webkit-autofill,
+html.dark select:-webkit-autofill {
+  -webkit-text-fill-color: #e2e8f0; /* slate-200 */
+  caret-color: #e2e8f0;
+  -webkit-box-shadow: 0 0 0px 1000px #020617 inset; /* slate-950 */
+  box-shadow: 0 0 0px 1000px #020617 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Optional: keep borders consistent if your inputs look odd */
+html.dark input:-webkit-autofill:focus,
+html.dark textarea:-webkit-autofill:focus,
+html.dark select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #020617 inset, 0 0 0 2px rgba(44, 110, 145, 0.3);
+  box-shadow: 0 0 0px 1000px #020617 inset, 0 0 0 2px rgba(44, 110, 145, 0.3);
+}
+
+/* Keep select arrows consistent in dark mode on iOS/WebKit */
+.select-field {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%2364748B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 1rem 1rem;
+}
+
+.select-field::-ms-expand {
+  display: none;
+}
+
+html.dark .select-field {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%23CBD5E1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}

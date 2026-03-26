@@ -30,11 +30,11 @@ function BottomNav({ activeTab, onTabChange }) {
       )
     },
     {
-      id: 'analytics',
-      label: 'Analytics',
+      id: 'calendar',
+      label: 'Calendar',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
       )
     },
@@ -50,7 +50,7 @@ function BottomNav({ activeTab, onTabChange }) {
   ];
 
   return (
-    <nav className="bg-white border-t border-slate-200 pt-2 pb-3 px-2">
+    <nav className="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pt-2 pb-3 px-2">
       <div className="flex justify-around items-center">
         {tabs.map(tab => (
           <button
@@ -59,12 +59,12 @@ function BottomNav({ activeTab, onTabChange }) {
             className={`flex flex-col items-center gap-1 min-w-[56px] min-h-[44px] justify-center transition-all duration-200 ${
               activeTab === tab.id
                 ? 'text-[#2C6E91]'
-                : 'text-slate-400 hover:text-slate-600'
+                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
             }`}
           >
             <div className={`${
               activeTab === tab.id
-                ? 'bg-blue-50 text-[#2C6E91] rounded-full p-2 -mt-1'
+                ? 'bg-blue-50 dark:bg-[#2C6E91]/10 text-[#2C6E91] rounded-full p-2 -mt-1'
                 : 'p-1'
             }`}>
               {tab.icon}

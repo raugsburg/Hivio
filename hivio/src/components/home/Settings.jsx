@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AutocompleteInput from '../common/Autocompleteinput';
+import { MN_SCHOOLS } from '../../data/schools-mn';
+import { COMMON_MAJORS } from '../../data/majors';
 
 const careerInterests = [
   'Software Engineering', 'Product Management', 'Data Science',
@@ -17,7 +20,7 @@ const DEFAULT_DASHBOARD_WIDGETS = {
 };
 
 /**
- * Removed "Response Rate" from dashboard personalization (leave to Analytics),
+ * Removed "Response Rate" from dashboard personalization,
  * so users don't toggle a widget that isn't implemented on Dashboard.
  */
 const dashboardWidgetsList = [
@@ -90,8 +93,44 @@ function safeWriteUser(nextUser) {
   localStorage.setItem(getUserStorageKey(), JSON.stringify(nextUser));
 }
 
+function normalizeText(s) {
+  return (s || '').trim().replace(/\s+/g, ' ');
+}
+
 function Settings({ user, onLogout, onUpdateUser }) {
   const [view, setView] = useState('main'); // main | account | dashboard
+
+  // ---- Dark mode state + helpers ----
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('hivio_theme') || 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
+
+    try {
+      localStorage.setItem('hivio_theme', theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }
+
+  const gradYearOptions = useMemo(() => {
+    const start = new Date().getFullYear();
+    const years = [];
+    for (let i = 0; i < 9; i++) years.push(String(start + i));
+    return years;
+  }, []);
 
   const initialForm = useMemo(() => {
     return {
@@ -100,11 +139,10 @@ function Settings({ user, onLogout, onUpdateUser }) {
       email: user?.email || '',
       avatarUrl: user?.avatarUrl || '',
 
-      // profile
+      // profile (standardized like ProfileSetup)
       school: user?.profile?.school || '',
       major: user?.profile?.major || '',
       gradYear: user?.profile?.gradYear || '',
-      location: user?.profile?.location || '',
       interests: Array.isArray(user?.profile?.interests) ? user.profile.interests : [],
 
       // dashboard widgets
@@ -126,6 +164,16 @@ function Settings({ user, onLogout, onUpdateUser }) {
     setError('');
     setSuccess('');
   }, [view]);
+
+  const pageWrap = 'flex flex-col min-h-full px-5 py-6 bg-[#F7F9FC] dark:bg-slate-950';
+  const card = 'bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-800';
+  const title = 'text-slate-900 dark:text-slate-100';
+  const subText = 'text-slate-500 dark:text-slate-300';
+  const faintText = 'text-slate-400 dark:text-slate-400';
+  const btnOutline = 'px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 min-h-[40px]';
+
+  const inputBase =
+    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
 
   function handleBasicChange(e) {
     const { name, value } = e.target;
@@ -185,12 +233,18 @@ function Settings({ user, onLogout, onUpdateUser }) {
   }
 
   function validateAccount() {
-    if (!form.name.trim()) return 'Name is required.';
-    if (!form.email.trim()) return 'Email is required.';
+    if (!normalizeText(form.name)) return 'Name is required.';
+    if (!normalizeText(form.email)) return 'Email is required.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       return 'Enter a valid email address.';
     }
-    if (form.gradYear && !/^\d{4}$/.test(form.gradYear.trim())) {
+
+    // standardized profile fields like ProfileSetup
+    if (!normalizeText(form.school)) return 'School is required.';
+    if (!normalizeText(form.major)) return 'Major is required.';
+    if (!String(form.gradYear || '').trim()) return 'Graduation year is required.';
+
+    if (form.gradYear && !/^\d{4}$/.test(String(form.gradYear).trim())) {
       return 'Graduation year must be a 4-digit year (e.g., 2026).';
     }
     return '';
@@ -219,15 +273,14 @@ function Settings({ user, onLogout, onUpdateUser }) {
 
     const updatedUser = {
       ...storedUser,
-      name: form.name.trim(),
+      name: normalizeText(form.name),
       email: form.email.trim().toLowerCase(),
       avatarUrl: form.avatarUrl || null,
       profile: {
         ...(storedUser.profile || {}),
-        school: form.school.trim(),
-        major: form.major.trim(),
-        gradYear: form.gradYear.trim(),
-        location: form.location.trim(),
+        school: normalizeText(form.school),
+        major: normalizeText(form.major),
+        gradYear: String(form.gradYear),
         interests: form.interests || []
       }
     };
@@ -273,32 +326,32 @@ function Settings({ user, onLogout, onUpdateUser }) {
   // =========================
   if (view === 'account') {
     return (
-      <div className="flex flex-col px-5 py-6 bg-[#F7F9FC]">
+      <div className={pageWrap}>
         <div className="flex items-center justify-between mb-4">
           <button
             type="button"
             onClick={() => setView('main')}
-            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 min-h-[40px]"
+            className={btnOutline}
           >
             Back
           </button>
-          <p className="text-sm font-bold text-slate-800">Account Details</p>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Account Details</p>
           <div className="w-[64px]" />
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
             {success}
           </div>
         )}
 
-        {/* Avatar (same circular style as onboarding) */}
+        {/* Avatar */}
         <div className="flex flex-col items-center mb-6">
           <div
             className="relative group cursor-pointer"
@@ -310,7 +363,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
             }}
             aria-label="Change profile photo"
           >
-            <div className="w-24 h-24 bg-slate-100 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-[#2C6E91] transition-all overflow-hidden">
+            <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 dark:text-slate-300 group-hover:bg-blue-50 dark:group-hover:bg-[#2C6E91]/10 group-hover:text-[#2C6E91] transition-all overflow-hidden">
               {form.avatarUrl ? (
                 <img src={form.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -320,7 +373,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
                 </svg>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 bg-[#2C6E91] text-white p-1.5 rounded-full border-2 border-white">
+            <div className="absolute bottom-0 right-0 bg-[#2C6E91] text-white p-1.5 rounded-full border-2 border-white dark:border-slate-900">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
                 <circle cx="12" cy="13" r="3" />
@@ -328,7 +381,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
             </div>
           </div>
 
-          <p className="text-sm font-semibold text-slate-500 mt-4">
+          <p className={`text-sm font-semibold mt-4 ${subText}`}>
             {form.avatarUrl ? 'Tap to change photo' : 'Add a photo'}
           </p>
 
@@ -343,95 +396,104 @@ function Settings({ user, onLogout, onUpdateUser }) {
           <button
             type="button"
             onClick={() => setForm((prev) => ({ ...prev, avatarUrl: '' }))}
-            className="mt-3 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+            className="mt-3 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             Remove photo
           </button>
         </div>
 
         {/* Basic */}
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 mb-4">
-          <p className="text-sm font-bold text-slate-800 mb-3">Basic</p>
+        <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-3">Basic</p>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                 Full Name
               </label>
               <input
                 name="name"
                 value={form.name}
                 onChange={handleBasicChange}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                className={inputBase}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                 Email
               </label>
               <input
                 name="email"
                 value={form.email}
                 onChange={handleBasicChange}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                className={inputBase}
               />
-              <p className="text-[11px] text-slate-400 font-medium mt-1 ml-1">
+              <p className={`text-[11px] font-medium mt-1 ml-1 ${faintText}`}>
                 This is used for login in your local MVP.
               </p>
             </div>
           </div>
         </div>
 
-        {/* School */}
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 mb-4">
-          <p className="text-sm font-bold text-slate-800 mb-3">School</p>
+        {/* Academic (standardized like ProfileSetup) */}
+        <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-3">Academic</p>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
-                School
-              </label>
-              <input
-                name="school"
-                value={form.school}
-                onChange={handleBasicChange}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
-            </div>
+          <div className="space-y-4">
+            <AutocompleteInput
+              label="School / University"
+              value={form.school}
+              onChange={(v) => {
+                setForm((prev) => ({ ...prev, school: v }));
+                if (error) setError('');
+                if (success) setSuccess('');
+              }}
+              options={MN_SCHOOLS}
+              placeholder="Start typing your school (Minnesota list)..."
+              required
+            />
+
+            <AutocompleteInput
+              label="Major / Field of Study"
+              value={form.major}
+              onChange={(v) => {
+                setForm((prev) => ({ ...prev, major: v }));
+                if (error) setError('');
+                if (success) setSuccess('');
+              }}
+              options={COMMON_MAJORS}
+              placeholder="Start typing your major..."
+              required
+            />
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
-                Major
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
+                Graduation Year *
               </label>
-              <input
-                name="major"
-                value={form.major}
-                onChange={handleBasicChange}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
-                Graduation Year
-              </label>
-              <input
-                name="gradYear"
+              <select
                 value={form.gradYear}
-                onChange={handleBasicChange}
-                placeholder="2026"
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-              />
+                onChange={(e) => {
+                  setForm((prev) => ({ ...prev, gradYear: e.target.value }));
+                  if (error) setError('');
+                  if (success) setSuccess('');
+                }}
+                className={`${inputBase} select-field py-3.5`}
+              >
+                <option value="" disabled>Select year</option>
+                {gradYearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
         {/* Interests */}
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 mb-4">
+        <div className={`${card} mb-4 p-4`}>
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <p className="text-sm font-bold text-slate-800">Career Interests</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Career Interests</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 {form.interests?.length || 0} selected
               </p>
@@ -439,33 +501,24 @@ function Settings({ user, onLogout, onUpdateUser }) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {careerInterests.map((interest) => (
-              <button
-                key={interest}
-                type="button"
-                onClick={() => toggleInterest(interest)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  form.interests?.includes(interest)
-                    ? 'bg-[#2C6E91] text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {interest}
-              </button>
-            ))}
+            {careerInterests.map((interest) => {
+              const selected = form.interests?.includes(interest);
+              return (
+                <button
+                  key={interest}
+                  type="button"
+                  onClick={() => toggleInterest(interest)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    selected
+                      ? 'bg-[#2C6E91] text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {interest}
+                </button>
+              );
+            })}
           </div>
-        </div>
-
-        {/* Preferred Location */}
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 mb-4">
-          <p className="text-sm font-bold text-slate-800 mb-3">Preferred Location</p>
-          <input
-            name="location"
-            value={form.location}
-            onChange={handleBasicChange}
-            placeholder="e.g. Minneapolis, MN or Remote"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-          />
         </div>
 
         <button
@@ -486,33 +539,33 @@ function Settings({ user, onLogout, onUpdateUser }) {
   // =========================
   if (view === 'dashboard') {
     return (
-      <div className="flex flex-col px-5 py-6 bg-[#F7F9FC]">
+      <div className={pageWrap}>
         <div className="flex items-center justify-between mb-4">
           <button
             type="button"
             onClick={() => setView('main')}
-            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 min-h-[40px]"
+            className={btnOutline}
           >
             Back
           </button>
-          <p className="text-sm font-bold text-slate-800">Dashboard</p>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Dashboard</p>
           <div className="w-[64px]" />
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
             {success}
           </div>
         )}
 
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 mb-4">
-          <p className="text-sm font-bold text-slate-800 mb-1">Dashboard Widgets</p>
+        <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Dashboard Widgets</p>
           <p className="text-xs text-slate-400 mb-3">
             Toggle what shows on your home screen.
           </p>
@@ -527,20 +580,20 @@ function Settings({ user, onLogout, onUpdateUser }) {
                   onClick={() => toggleWidget(widget.id)}
                   className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
                     enabled
-                      ? 'border-[#2C6E91] bg-blue-50/40 ring-1 ring-[#2C6E91]/20'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-[#2C6E91] bg-blue-50/40 dark:bg-[#2C6E91]/10 ring-1 ring-[#2C6E91]/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      enabled ? 'bg-[#2C6E91] text-white' : 'bg-slate-100 text-slate-400'
+                      enabled ? 'bg-[#2C6E91] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-300'
                     }`}
                   >
                     {widget.icon}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${enabled ? 'text-[#2C6E91]' : 'text-slate-700'}`}>
+                    <div className={`text-sm font-semibold ${enabled ? 'text-[#2C6E91]' : 'text-slate-700 dark:text-slate-200'}`}>
                       {widget.label}
                     </div>
                     <div className="text-xs text-slate-400 truncate">{widget.desc}</div>
@@ -548,7 +601,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
 
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      enabled ? 'border-[#2C6E91] bg-[#2C6E91]' : 'border-slate-300'
+                      enabled ? 'border-[#2C6E91] bg-[#2C6E91]' : 'border-slate-300 dark:border-slate-600'
                     }`}
                   >
                     {enabled && (
@@ -567,7 +620,7 @@ function Settings({ user, onLogout, onUpdateUser }) {
           <button
             type="button"
             onClick={resetWidgetsToDefaults}
-            className="flex-1 border border-slate-200 text-slate-700 font-semibold py-3.5 rounded-xl hover:bg-slate-50 transition-colors min-h-[44px]"
+            className="flex-1 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
           >
             Reset defaults
           </button>
@@ -590,17 +643,17 @@ function Settings({ user, onLogout, onUpdateUser }) {
   // Main Settings page
   // =========================
   return (
-    <div className="flex flex-col px-5 py-6 bg-[#F7F9FC]">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">
+    <div className={pageWrap}>
+      <h1 className={`text-2xl font-bold tracking-tight ${title} mb-6`}>
         Settings
       </h1>
 
-      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 flex items-center gap-4 mb-6">
+      <div className={`${card} flex items-center gap-4 mb-6 p-4`}>
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt="Avatar"
-            className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
+            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-slate-900 shadow-sm"
           />
         ) : (
           <div className="w-14 h-14 rounded-full bg-[#2C6E91] flex items-center justify-center text-white font-bold text-lg shadow-sm">
@@ -608,24 +661,24 @@ function Settings({ user, onLogout, onUpdateUser }) {
           </div>
         )}
         <div className="flex-1">
-          <h2 className="text-base font-bold text-slate-900">{user.name}</h2>
-          <p className="text-sm text-slate-500">{user.email}</p>
+          <h2 className={`text-base font-bold ${title}`}>{user.name}</h2>
+          <p className={`text-sm ${subText}`}>{user.email}</p>
           {user.profile && (
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className={`text-xs mt-0.5 ${faintText}`}>
               {user.profile.school} · {user.profile.gradYear}
             </p>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 divide-y divide-slate-50 mb-6">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800 mb-6">
         <button
           type="button"
           onClick={() => setView('account')}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors rounded-t-2xl min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-t-2xl min-h-[44px]"
         >
-          <span className="font-semibold text-slate-700">Account Details</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+          <span className="font-semibold text-slate-700 dark:text-slate-200">Account Details</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -633,41 +686,58 @@ function Settings({ user, onLogout, onUpdateUser }) {
         <button
           type="button"
           onClick={() => setView('dashboard')}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
         >
-          <span className="font-semibold text-slate-700">Dashboard</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+          <span className="font-semibold text-slate-700 dark:text-slate-200">Dashboard</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
 
         <button
           type="button"
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
         >
-          <span className="font-semibold text-slate-700">Notifications</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+          <span className="font-semibold text-slate-700 dark:text-slate-200">Notifications</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
 
+        {/* Appearance toggle */}
         <button
           type="button"
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors rounded-b-2xl min-h-[44px]"
+          onClick={toggleTheme}
+          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-b-2xl min-h-[44px]"
         >
-          <span className="font-semibold text-slate-700">Appearance</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-200">Appearance</span>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">Light</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-400">
+              {theme === 'dark' ? 'Dark' : 'Light'}
+            </span>
+            <div
+              className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 border ${
+                theme === 'dark'
+                  ? 'bg-[#2C6E91]/20 border-[#2C6E91]/30'
+                  : 'bg-slate-100 border-slate-200'
+              }`}
+              aria-hidden="true"
+            >
+              <div
+                className={`w-5 h-5 rounded-full transition-transform ${
+                  theme === 'dark'
+                    ? 'bg-[#2C6E91] translate-x-5'
+                    : 'bg-white translate-x-0'
+                }`}
+              />
+            </div>
           </div>
         </button>
       </div>
 
       <button
         onClick={onLogout}
-        className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-3.5 rounded-xl transition-colors min-h-[44px]"
+        className="w-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 text-red-600 dark:text-red-300 font-semibold py-3.5 rounded-xl transition-colors min-h-[44px] border border-red-100 dark:border-red-900/40"
       >
         Sign Out
       </button>

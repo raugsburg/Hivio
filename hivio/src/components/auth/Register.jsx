@@ -61,64 +61,69 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
     onRegistrationComplete(userData);
   }
 
+  const inputBase =
+    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+
   return (
-    <div className="flex flex-col min-h-screen px-8 py-10 bg-white relative">
+    <div className="flex flex-col min-h-screen px-8 py-10 bg-[#F7F9FC] dark:bg-slate-950 relative">
       <div className="flex flex-col mb-10 mt-16">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Create Account</h1>
-        <p className="text-slate-500 font-medium leading-relaxed">Join Hivio and get your job search organized today.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Create Account</h1>
+        <p className="text-slate-500 dark:text-slate-300 font-medium leading-relaxed">
+          Join Hivio and get your job search organized today.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Full Name</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Full Name</label>
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
             placeholder="Alex Carter"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
-          {errors.name && <span className="text-red-500 text-xs mt-1 ml-1">{errors.name}</span>}
+          {errors.name && <span className="text-red-500 dark:text-red-300 text-xs mt-1 ml-1">{errors.name}</span>}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Email</label>
           <input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             placeholder="student@university.edu"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
-          {errors.email && <span className="text-red-500 text-xs mt-1 ml-1">{errors.email}</span>}
+          {errors.email && <span className="text-red-500 dark:text-red-300 text-xs mt-1 ml-1">{errors.email}</span>}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Password</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Password</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             placeholder="At least 8 characters"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
-          {errors.password && <span className="text-red-500 text-xs mt-1 ml-1">{errors.password}</span>}
+          {errors.password && <span className="text-red-500 dark:text-red-300 text-xs mt-1 ml-1">{errors.password}</span>}
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Confirm Password</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Confirm Password</label>
           <input
             type="password"
             name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
             placeholder="Re-enter your password"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
-          {errors.confirmPassword && <span className="text-red-500 text-xs mt-1 ml-1">{errors.confirmPassword}</span>}
+          {errors.confirmPassword && <span className="text-red-500 dark:text-red-300 text-xs mt-1 ml-1">{errors.confirmPassword}</span>}
         </div>
 
         <button
@@ -129,7 +134,7 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
         </button>
       </form>
 
-      <p className="text-center text-slate-500 text-sm mt-10 font-medium">
+      <p className="text-center text-slate-500 dark:text-slate-300 text-sm mt-10 font-medium">
         Already have an account?{' '}
         <button type="button" onClick={onSwitchToLogin} className="text-[#2C6E91] font-semibold hover:underline">
           Sign in

@@ -63,8 +63,11 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
     onLogin(user);
   }
 
+  const inputBase =
+    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+
   return (
-    <div className="flex flex-col min-h-screen px-8 pt-16 pb-8 justify-start bg-white">
+    <div className="flex flex-col min-h-screen px-8 pt-16 pb-8 justify-start bg-[#F7F9FC] dark:bg-slate-950">
       {/* Logo + branding */}
       <div className="flex flex-col items-center mb-8">
         <svg
@@ -100,8 +103,8 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
           <line x1="18" y1="34" x2="10" y2="44" stroke="#2C6E91" strokeWidth="1" opacity="0.3" />
         </svg>
 
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-1">Hivio</h1>
-        <p className="text-slate-500 text-center font-medium text-sm">
+        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-1">Hivio</h1>
+        <p className="text-slate-500 dark:text-slate-300 text-center font-medium text-sm">
           Turning applications into interviews
         </p>
       </div>
@@ -109,25 +112,25 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Email</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Email</label>
           <input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             placeholder="student@university.edu"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">Password</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Password</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             placeholder="••••••••"
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className={inputBase}
           />
         </div>
         <div className="text-left">
@@ -141,7 +144,7 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
             {error}
           </div>
         )}
@@ -154,7 +157,7 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
         </button>
       </form>
 
-      <p className="text-center text-slate-500 text-sm mt-6 font-medium">
+      <p className="text-center text-slate-500 dark:text-slate-300 text-sm mt-6 font-medium">
         New to Hivio?{' '}
         <button
           type="button"

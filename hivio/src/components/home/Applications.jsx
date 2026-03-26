@@ -200,7 +200,7 @@ function Applications({ user }) {
   }
 
   function openAdd() {
-    scrollAppContainerToTop
+    scrollAppContainerToTop();
     setSuccess('');
     setError('');
     setAddForm(emptyForm());
@@ -477,14 +477,23 @@ function Applications({ user }) {
 
   const archivedApps = apps.filter((a) => a.archived);
 
+  const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';
+  const cardBg = 'bg-white dark:bg-slate-900';
+  const border = 'border border-slate-200 dark:border-slate-800';
+  const textMain = 'text-slate-900 dark:text-slate-100';
+  const textSub = 'text-slate-500 dark:text-slate-300';
+
+  const inputBase =
+    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+
   return (
-    <div className="relative flex flex-col min-h-full px-5 py-6 bg-[#F7F9FC]">
+    <div className={`relative flex flex-col min-h-full px-5 py-6 ${pageBg}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-1">
+          <h1 className={`text-2xl font-bold tracking-tight ${textMain} mb-1`}>
             Applications
           </h1>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className={`text-sm ${textSub} font-medium`}>
             Track every job you&apos;ve applied to.
           </p>
         </div>
@@ -510,7 +519,7 @@ function Applications({ user }) {
                 className={
                   selected
                     ? 'px-3 py-2 rounded-xl bg-[#2C6E91] text-white text-xs font-semibold shadow-sm'
-                    : 'px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50'
+                    : 'px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800'
                 }
               >
                 {chip.label}
@@ -524,7 +533,7 @@ function Applications({ user }) {
         <button
           type="button"
           onClick={() => setShowArchived((p) => !p)}
-          className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
         >
           {showArchived ? 'Hide archived' : 'Show archived'}
           {archivedApps.length ? ` (${archivedApps.length})` : ''}
@@ -532,17 +541,17 @@ function Applications({ user }) {
       </div>
 
       {success && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium px-4 py-3 rounded-xl">
+        <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
           {success}
         </div>
       )}
 
       {activeAppsFiltered.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-center">
-          <p className="text-sm font-medium text-slate-500">
+        <div className={`${cardBg} ${border} rounded-2xl p-6 shadow-sm text-center`}>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
             No applications found.
           </p>
-          <p className="text-xs text-slate-500 font-medium mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
             Try changing the filter or add a new application.
           </p>
         </div>
@@ -551,14 +560,14 @@ function Applications({ user }) {
           {activeAppsFiltered.map((a) => (
             <div
               key={a.id}
-              className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"
+              className={`${cardBg} ${border} rounded-2xl p-4 shadow-sm`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
+                  <p className={`text-sm font-semibold ${textMain} truncate`}>
                     {a.title}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium mt-1 truncate">
+                  <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
                     {a.company}
                     {a.location ? ` • ${a.location}` : ''}
                   </p>
@@ -567,20 +576,20 @@ function Applications({ user }) {
                   </p>
 
                   {a.followUpDate ? (
-                    <p className="text-xs text-slate-500 font-medium mt-1 truncate">
+                    <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
                       Follow-up: {a.followUpDate}
                     </p>
                   ) : null}
 
                   {a.resumeId ? (
-                    <p className="text-xs text-slate-500 font-medium mt-1 truncate">
+                    <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
                       Resume: {resumeLabelById(a.resumeId)}
                     </p>
                   ) : null}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">
+                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold">
                     {a.status}
                   </span>
 
@@ -590,32 +599,32 @@ function Applications({ user }) {
                       onClick={() =>
                         setOpenMenuId((prev) => (prev === a.id ? null : a.id))
                       }
-                      className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                      className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-50 dark:hover:bg-slate-800"
                       aria-label="More actions"
                     >
                       ⋯
                     </button>
 
                     {openMenuId === a.id && (
-                      <div className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-10">
+                      <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden z-10">
                         <button
                           type="button"
                           onClick={() => openEdit(a)}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                           View / Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => handleArchive(a.id)}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                         >
                           Archive
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(a.id)}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                         >
                           Delete
                         </button>
@@ -626,7 +635,7 @@ function Applications({ user }) {
               </div>
 
               {a.notes ? (
-                <p className="text-sm text-slate-600 mt-3 whitespace-pre-wrap line-clamp-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 whitespace-pre-wrap line-clamp-3">
                   {a.notes}
                 </p>
               ) : null}
@@ -637,21 +646,21 @@ function Applications({ user }) {
 
       {showArchived && archivedApps.length > 0 && (
         <div className="mt-5">
-          <h2 className="text-sm font-semibold text-slate-800 mb-3">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">
             Archived
           </h2>
           <div className="space-y-3">
             {archivedApps.map((a) => (
               <div
                 key={a.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"
+                className={`${cardBg} ${border} rounded-2xl p-4 shadow-sm`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">
+                    <p className={`text-sm font-semibold ${textMain} truncate`}>
                       {a.title}
                     </p>
-                    <p className="text-xs text-slate-500 font-medium mt-1 truncate">
+                    <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
                       {a.company}
                     </p>
                     <p className="text-xs text-slate-400 font-medium mt-1">
@@ -662,7 +671,7 @@ function Applications({ user }) {
                   <button
                     type="button"
                     onClick={() => handleUnarchive(a.id)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     Unarchive
                   </button>
@@ -680,14 +689,14 @@ function Applications({ user }) {
           style={{ overscrollBehavior: 'contain' }}
         >
           <div
-            className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden"
+            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200">
+            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={closeAdd}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Close
               </button>
@@ -698,38 +707,38 @@ function Applications({ user }) {
               style={{ overscrollBehavior: 'contain' }}
             >
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
                   {error}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Company *
                 </label>
                 <input
                   name="company"
                   value={addForm.company}
                   onChange={handleAddChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={inputBase}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Job Title *
                 </label>
                 <input
                   name="title"
                   value={addForm.title}
                   onChange={handleAddChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={inputBase}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Date *
                   </label>
                   <input
@@ -737,19 +746,19 @@ function Applications({ user }) {
                     name="date"
                     value={addForm.date}
                     onChange={handleAddChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Status *
                   </label>
                   <select
                     name="status"
                     value={addForm.status}
                     onChange={handleAddChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={`${inputBase} select-field`}
                   >
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s} value={s}>
@@ -762,7 +771,7 @@ function Applications({ user }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Follow-Up
                   </label>
                   <input
@@ -770,12 +779,12 @@ function Applications({ user }) {
                     name="followUpDate"
                     value={addForm.followUpDate}
                     onChange={handleAddChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Location
                   </label>
                   <input
@@ -783,21 +792,21 @@ function Applications({ user }) {
                     value={addForm.location}
                     onChange={handleAddChange}
                     placeholder="Remote / City"
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Resume Used
                   </label>
 
                   <button
                     type="button"
                     onClick={() => setShowAddResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     {showAddResumeUpload ? 'Hide upload' : 'Upload new'}
                   </button>
@@ -807,7 +816,7 @@ function Applications({ user }) {
                   name="resumeId"
                   value={addForm.resumeId}
                   onChange={handleAddChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={`${inputBase} select-field`}
                 >
                   <option value="">None</option>
                   {resumes.map((r) => (
@@ -818,12 +827,12 @@ function Applications({ user }) {
                 </select>
 
                 {showAddResumeUpload && (
-                  <div className="mt-2 border border-slate-200 bg-slate-50 rounded-xl p-3">
+                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleAddResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-white"
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
                       >
                         Choose File
                       </button>
@@ -839,17 +848,17 @@ function Applications({ user }) {
 
                     {addResumeFile && (
                       <div className="mt-2">
-                        <p className="text-xs text-slate-600 font-medium truncate">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
                           Selected: {addResumeFile.name}
                         </p>
 
-                        <label className="block text-xs font-semibold text-slate-600 mt-2 mb-1 ml-1">
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
                           Label
                         </label>
                         <input
                           value={addResumeLabel}
                           onChange={(e) => setAddResumeLabel(e.target.value)}
-                          className="w-full bg-white border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                          className={inputBase}
                         />
 
                         <button
@@ -866,7 +875,7 @@ function Applications({ user }) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Notes
                 </label>
                 <textarea
@@ -874,7 +883,7 @@ function Applications({ user }) {
                   value={addForm.notes}
                   onChange={handleAddChange}
                   rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all resize-none"
+                  className={`${inputBase} resize-none`}
                 />
               </div>
 
@@ -897,14 +906,14 @@ function Applications({ user }) {
           style={{ overscrollBehavior: 'contain' }}
         >
           <div
-            className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden"
+            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200">
+            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={closeEdit}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Close
               </button>
@@ -915,38 +924,38 @@ function Applications({ user }) {
               style={{ overscrollBehavior: 'contain' }}
             >
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
                   {error}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Company *
                 </label>
                 <input
                   name="company"
                   value={editForm.company}
                   onChange={handleEditChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={inputBase}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Job Title *
                 </label>
                 <input
                   name="title"
                   value={editForm.title}
                   onChange={handleEditChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={inputBase}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Date *
                   </label>
                   <input
@@ -954,19 +963,19 @@ function Applications({ user }) {
                     name="date"
                     value={editForm.date}
                     onChange={handleEditChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Status *
                   </label>
                   <select
                     name="status"
                     value={editForm.status}
                     onChange={handleEditChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={`${inputBase} select-field`}
                   >
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s} value={s}>
@@ -979,7 +988,7 @@ function Applications({ user }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Follow-Up
                   </label>
                   <input
@@ -987,12 +996,12 @@ function Applications({ user }) {
                     name="followUpDate"
                     value={editForm.followUpDate}
                     onChange={handleEditChange}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Location
                   </label>
                   <input
@@ -1000,21 +1009,21 @@ function Applications({ user }) {
                     value={editForm.location}
                     onChange={handleEditChange}
                     placeholder="Remote / City"
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                    className={inputBase}
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Resume Used
                   </label>
 
                   <button
                     type="button"
                     onClick={() => setShowEditResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     {showEditResumeUpload ? 'Hide upload' : 'Upload new'}
                   </button>
@@ -1024,7 +1033,7 @@ function Applications({ user }) {
                   name="resumeId"
                   value={editForm.resumeId}
                   onChange={handleEditChange}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                  className={`${inputBase} select-field`}
                 >
                   <option value="">None</option>
                   {resumes.map((r) => (
@@ -1035,18 +1044,18 @@ function Applications({ user }) {
                 </select>
 
                 {editForm.resumeId ? (
-                  <p className="text-xs text-slate-500 font-medium mt-1 ml-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 ml-1">
                     Currently linked: {resumeLabelById(editForm.resumeId)}
                   </p>
                 ) : null}
 
                 {showEditResumeUpload && (
-                  <div className="mt-2 border border-slate-200 bg-slate-50 rounded-xl p-3">
+                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={handleEditResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-white"
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
                       >
                         Choose File
                       </button>
@@ -1062,17 +1071,17 @@ function Applications({ user }) {
 
                     {editResumeFile && (
                       <div className="mt-2">
-                        <p className="text-xs text-slate-600 font-medium truncate">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
                           Selected: {editResumeFile.name}
                         </p>
 
-                        <label className="block text-xs font-semibold text-slate-600 mt-2 mb-1 ml-1">
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
                           Label
                         </label>
                         <input
                           value={editResumeLabel}
                           onChange={(e) => setEditResumeLabel(e.target.value)}
-                          className="w-full bg-white border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+                          className={inputBase}
                         />
 
                         <button
@@ -1089,7 +1098,7 @@ function Applications({ user }) {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                   Notes
                 </label>
                 <textarea
@@ -1097,7 +1106,7 @@ function Applications({ user }) {
                   value={editForm.notes}
                   onChange={handleEditChange}
                   rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all resize-none"
+                  className={`${inputBase} resize-none`}
                 />
               </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PhoneFrame from './components/PhoneFrame';
 import Register from './components/auth/Register';
 import Login from './components/auth/Login';
@@ -7,15 +7,21 @@ import ProfileSetup from './components/onboarding/ProfileSetup';
 import Dashboard from './components/home/Dashboard';
 import Applications from './components/home/Applications';
 import Resumes from './components/home/Resumes';
-import Analytics from './components/home/Analytics';
+import Calendar from './components/home/Calendar';
 import Settings from './components/home/Settings';
 import BottomNav from './components/BottomNav';
 import './App.css';
+
+import { applyThemeClass, getStoredTheme } from './utils/theme';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [screen, setScreen] = useState('login');
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  useEffect(() => {
+    applyThemeClass(getStoredTheme());
+  }, []);
 
   function handleRegistrationComplete(user) {
     setCurrentUser(user);
@@ -50,15 +56,15 @@ function App() {
         return <Applications user={currentUser} />;
       case 'resumes':
         return <Resumes user={currentUser} />;
-      case 'analytics':
-        return <Analytics user={currentUser} />;
+      case 'calendar':
+        return <Calendar user={currentUser} />;
       case 'settings':
-        return(
-          <Settings 
-            user={currentUser} 
-            onLogout={handleLogout} 
+        return (
+          <Settings
+            user={currentUser}
+            onLogout={handleLogout}
             onUpdateUser={setCurrentUser}
-            />
+          />
         );
       default:
         return <Dashboard user={currentUser} onTabChange={setActiveTab} />;
@@ -68,10 +74,7 @@ function App() {
   function renderScreen() {
     if (screen === 'profileSetup' && currentUser) {
       return (
-        <ProfileSetup
-          user={currentUser}
-          onProfileComplete={handleProfileComplete}
-        />
+        <ProfileSetup user={currentUser} onProfileComplete={handleProfileComplete} />
       );
     }
 
@@ -96,12 +99,8 @@ function App() {
     }
 
     if (screen === 'forgotPassword') {
-  return (
-    <ForgotPassword
-      onSwitchToLogin={() => setScreen('login')}
-    />
-  );
-}
+      return <ForgotPassword onSwitchToLogin={() => setScreen('login')} />;
+    }
 
     return (
       <Login
@@ -114,9 +113,7 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      <PhoneFrame>
-        {renderScreen()}
-      </PhoneFrame>
+      <PhoneFrame>{renderScreen()}</PhoneFrame>
     </div>
   );
 }
