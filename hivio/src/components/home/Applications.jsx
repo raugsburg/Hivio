@@ -477,6 +477,21 @@ function Applications({ user }) {
 
   const archivedApps = apps.filter((a) => a.archived);
 
+  // Calculate stats
+  const statsByStatus = activeAppsAll.reduce(
+    (acc, app) => {
+      const status = app.status || 'Applied';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const totalActive = activeAppsAll.length;
+  const appliedCount = statsByStatus.Applied || 0;
+  const interviewCount = statsByStatus.Interview || 0;
+  const offerCount = statsByStatus.Offer || 0;
+  const rejectedCount = statsByStatus.Rejected || 0;
+
   const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';
   const cardBg = 'bg-white dark:bg-slate-900';
   const border = 'border border-slate-200 dark:border-slate-800';
@@ -488,26 +503,42 @@ function Applications({ user }) {
 
   return (
     <div className={`relative flex flex-col min-h-full px-5 py-6 ${pageBg}`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h1 className={`text-2xl font-bold tracking-tight ${textMain} mb-1`}>
             Applications
           </h1>
           <p className={`text-sm ${textSub} font-medium`}>
-            Track every job you&apos;ve applied to.
+            Track and manage every job application in your pipeline.
           </p>
         </div>
 
         <button
           type="button"
           onClick={openAdd}
-          className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2 rounded-xl shadow-md transition-colors min-h-[40px]"
+          className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition-colors min-h-[40px] whitespace-nowrap"
         >
           + Add
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-3 mb-3">
+      {totalActive > 0 && (
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="rounded-2xl p-4 shadow-[0_4px_12px_rgba(44,110,145,0.08)] border border-blue-200/50 dark:border-blue-500/20 bg-gradient-to-br from-blue-50 via-slate-50 to-slate-50 dark:from-blue-500/5 dark:via-slate-900 dark:to-slate-900">
+            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Total Active</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">{totalActive}</p>
+          </div>
+          <div className="rounded-2xl p-4 shadow-[0_4px_12px_rgba(15,118,110,0.08)] border border-teal-200/50 dark:border-teal-500/20 bg-gradient-to-br from-teal-50 via-slate-50 to-slate-50 dark:from-teal-500/5 dark:via-slate-900 dark:to-slate-900">
+            <p className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Interview Rate</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
+              {totalActive ? Math.round(((interviewCount + offerCount) / totalActive) * 100) : 0}%
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-4">
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Filter by Status</p>
         <div className="flex flex-wrap gap-2">
           {FILTER_CHIPS.map((chip) => {
             const selected = activeFilter === chip.id;
@@ -516,11 +547,11 @@ function Applications({ user }) {
                 key={chip.id}
                 type="button"
                 onClick={() => setActiveFilter(chip.id)}
-                className={
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
                   selected
-                    ? 'px-3 py-2 rounded-xl bg-[#2C6E91] text-white text-xs font-semibold shadow-sm'
-                    : 'px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800'
-                }
+                    ? 'bg-[#2C6E91] text-white shadow-[0_4px_12px_rgba(44,110,145,0.25)]'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:shadow-sm'
+                }`}
               >
                 {chip.label}
               </button>
@@ -533,9 +564,9 @@ function Applications({ user }) {
         <button
           type="button"
           onClick={() => setShowArchived((p) => !p)}
-          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
         >
-          {showArchived ? 'Hide archived' : 'Show archived'}
+          {showArchived ? '✓ Show Archived' : 'Show Archived'}
           {archivedApps.length ? ` (${archivedApps.length})` : ''}
         </button>
       </div>
@@ -547,12 +578,15 @@ function Applications({ user }) {
       )}
 
       {activeAppsFiltered.length === 0 ? (
-        <div className={`${cardBg} ${border} rounded-2xl p-6 shadow-sm text-center`}>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
-            No applications found.
+        <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-sm text-center`}>
+          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl">📝</span>
+          </div>
+          <p className={`text-sm font-semibold ${textMain}`}>
+            {activeFilter !== 'all' ? 'No applications with this status' : 'No applications yet'}
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-            Try changing the filter or add a new application.
+          <p className={`text-xs ${textSub} font-medium mt-1`}>
+            {activeFilter !== 'all' ? 'Try changing the filter or add a new application.' : 'Click "+ Add" above to start tracking your job applications.'}
           </p>
         </div>
       ) : (
@@ -560,7 +594,7 @@ function Applications({ user }) {
           {activeAppsFiltered.map((a) => (
             <div
               key={a.id}
-              className={`${cardBg} ${border} rounded-2xl p-4 shadow-sm`}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.06)] transition-shadow"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -589,7 +623,15 @@ function Applications({ user }) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                    a.status === 'Applied'
+                      ? 'bg-blue-50 dark:bg-blue-500/10 text-[#2C6E91] dark:text-blue-300'
+                      : a.status === 'Interview'
+                      ? 'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300'
+                      : a.status === 'Offer'
+                      ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                      : 'bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300'
+                  }`}>
                     {a.status}
                   </span>
 
@@ -645,10 +687,15 @@ function Applications({ user }) {
       )}
 
       {showArchived && archivedApps.length > 0 && (
-        <div className="mt-5">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">
-            Archived
-          </h2>
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className={`text-sm font-bold ${textMain}`}>
+                Archived
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{archivedApps.length} archived application{archivedApps.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
           <div className="space-y-3">
             {archivedApps.map((a) => (
               <div

@@ -189,26 +189,52 @@ function Resumes({ user }) {
   const inputBase =
     'w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
 
+  const totalSize = resumes.reduce((sum, r) => sum + (r.fileSize || 0), 0);
+
   return (
     <div className={`relative flex flex-col min-h-full px-5 py-6 ${pageBg}`}>
-      <h1 className={`text-2xl font-bold tracking-tight ${textMain} mb-2`}>
-        Resumes
-      </h1>
-      <p className={`text-sm ${textSub} font-medium mb-6`}>
-        Upload, label, and manage your resume versions.
-      </p>
+      <div className="mb-5">
+        <h1 className={`text-2xl font-bold tracking-tight ${textMain} mb-1`}>
+          Resumes
+        </h1>
+        <p className={`text-sm ${textSub} font-medium`}>
+          Upload, label, and manage your resume versions for different roles.
+        </p>
+      </div>
+
+      {resumes.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="rounded-2xl p-4 shadow-[0_4px_12px_rgba(44,110,145,0.08)] border border-blue-200/50 dark:border-blue-500/20 bg-gradient-to-br from-blue-50 via-slate-50 to-slate-50 dark:from-blue-500/5 dark:via-slate-900 dark:to-slate-900">
+            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Total Resumes</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">{resumes.length}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold">{formatBytes(totalSize)} total</p>
+          </div>
+          <div className="rounded-2xl p-4 shadow-[0_4px_12px_rgba(15,118,110,0.08)] border border-teal-200/50 dark:border-teal-500/20 bg-gradient-to-br from-teal-50 via-slate-50 to-slate-50 dark:from-teal-500/5 dark:via-slate-900 dark:to-slate-900">
+            <p className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Latest Upload</p>
+            <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100 mt-2 truncate line-clamp-1">
+              {resumes[0]?.label || resumes[0]?.fileName || 'N/A'}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+              {resumes[0]?.uploadedAt ? new Date(resumes[0].uploadedAt).toLocaleDateString() : 'N/A'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Upload section */}
-      <div className={`${cardBg} ${border} rounded-2xl p-4 shadow-sm mb-5`}>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-            Upload Resume
-          </h2>
+      <div className={`${cardBg} ${border} rounded-2xl p-5 shadow-sm mb-5`}>
+        <div className="flex items-center justify-between gap-4 mb-3">
+          <div>
+            <h2 className={`text-sm font-bold ${textMain}`}>
+              Upload Resume
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">PDF or DOCX • Max 5MB</p>
+          </div>
 
           <button
             type="button"
             onClick={openFilePicker}
-            className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2 rounded-xl shadow-md transition-colors min-h-[40px]"
+            className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition-colors min-h-[40px] whitespace-nowrap"
           >
             Choose File
           </button>
@@ -222,69 +248,71 @@ function Resumes({ user }) {
           />
         </div>
 
-        <div className="mt-3">
-          <p className="text-xs text-slate-500 dark:text-slate-300 font-medium">
-            Accepted: PDF, DOCX. Max size: 5MB.
-          </p>
+        {selectedFile && (
+          <div className="mt-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-950">
+            <p className={`text-sm font-semibold ${textMain}`}>
+              Selected: {selectedFile.name}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1">
+              {formatBytes(selectedFile.size)}
+            </p>
 
-          {selectedFile && (
-            <div className="mt-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-950">
-              <p className={`text-sm font-semibold ${textMain}`}>
-                Selected: {selectedFile.name}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1">
-                {formatBytes(selectedFile.size)}
-              </p>
-
-              <div className="mt-3">
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Label
-                </label>
-                <input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder="e.g., SWE Internship v1"
-                  className={inputBase}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSaveResume}
-                className="w-full mt-3 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors min-h-[44px]"
-              >
-                Save Resume
-              </button>
+            <div className="mt-3">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
+                Label
+              </label>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g., SWE Internship v1"
+                className={inputBase}
+              />
             </div>
-          )}
 
-          {error && (
-            <div className="mt-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={handleSaveResume}
+              className="w-full mt-3 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors min-h-[44px]"
+            >
+              Save Resume
+            </button>
+          </div>
+        )}
 
-          {success && (
-            <div className="mt-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
-              {success}
-            </div>
-          )}
-        </div>
+        {error && (
+          <div className="mt-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mt-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
+            {success}
+          </div>
+        )}
       </div>
 
       {/* Resume list */}
-      <div className="flex-1">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">
-          Saved Resumes
-        </h2>
+      <div className="flex-1 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className={`text-sm font-bold ${textMain}`}>
+              Your Resumes
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">Click to view, edit, or delete</p>
+          </div>
+        </div>
 
         {resumes.length === 0 ? (
-          <div className={`${cardBg} ${border} rounded-2xl p-6 shadow-sm text-center`}>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
-              No resumes uploaded yet.
+          <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-sm text-center`}>
+            <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl">📄</span>
+            </div>
+            <p className={`text-sm font-semibold ${textMain}`}>
+              No resumes yet
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-              Use “Choose File” above to upload your first resume.
+            <p className={`text-xs ${textSub} font-medium mt-1`}>
+              Upload your first resume above to get started.
             </p>
           </div>
         ) : (
@@ -343,7 +371,11 @@ function Resumes({ user }) {
                 </div>
 
                 <div className="mt-3 flex gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                    r.fileType === 'application/pdf'
+                      ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300'
+                      : 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                  }`}>
                     {r.fileType === 'application/pdf' ? 'PDF' : 'DOCX'}
                   </span>
                 </div>

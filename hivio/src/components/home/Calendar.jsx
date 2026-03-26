@@ -205,12 +205,14 @@ function Calendar({ user }) {
 
   return (
     <div className={`flex flex-col px-5 py-6 ${pageBg}`}>
-      <h1 className={`text-2xl font-bold tracking-tight ${title} mb-2`}>
-        Calendar + Reminders
-      </h1>
-      <p className="text-sm text-slate-500 dark:text-slate-300 font-medium mb-4">
-        Your schedule combines follow-ups from applications and custom reminders.
-      </p>
+      <div className="mb-5">
+        <h1 className={`text-2xl font-bold tracking-tight ${title} mb-1`}>
+          Calendar + Reminders
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">
+          Your schedule combines follow-ups from applications and custom reminders.
+        </p>
+      </div>
 
       <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.03)] mb-4`}>
         <div className="flex items-center justify-between mb-3">
@@ -293,7 +295,7 @@ function Calendar({ user }) {
       <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.03)] mb-4`}>
         <div className="mb-3">
           <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Add Reminder</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Create personal reminders for deadlines, prep, and follow-ups.</p>
+          <p className="text-xs text-slate-400 mt-0.5 font-medium">Create personal reminders for deadlines, prep, and follow-ups.</p>
         </div>
 
         {error && (
@@ -315,13 +317,13 @@ function Calendar({ user }) {
               type="date"
               value={form.date}
               onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert"
             />
             <input
               type="time"
               value={form.time}
               onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert"
             />
           </div>
 
@@ -329,21 +331,21 @@ function Calendar({ user }) {
             <button
               type="button"
               onClick={() => setForm((prev) => ({ ...prev, time: '09:00' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               9:00 AM
             </button>
             <button
               type="button"
               onClick={() => setForm((prev) => ({ ...prev, time: '13:00' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               1:00 PM
             </button>
             <button
               type="button"
               onClick={() => setForm((prev) => ({ ...prev, time: '' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               No time
             </button>
@@ -370,7 +372,7 @@ function Calendar({ user }) {
       <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.03)]`}>
         <div className="mb-3">
           <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">{selectedDate} Schedule</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Follow-ups and reminders for the selected day.</p>
+          <p className="text-xs text-slate-400 mt-0.5 font-medium">Follow-ups and reminders for the selected day.</p>
         </div>
 
         {selectedEvents.length === 0 ? (
@@ -378,12 +380,16 @@ function Calendar({ user }) {
         ) : (
           <div className="space-y-2">
             {selectedEvents.map((ev) => (
-              <div key={ev.id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-950">
+              <div key={ev.id} className={`rounded-xl border p-3 ${
+                ev.type === 'followup'
+                  ? 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/5'
+                  : 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/5'
+              }`}>
                 {ev.type === 'followup' ? (
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{ev.title}</p>
-                      <span className="text-[11px] font-semibold text-[#2C6E91] bg-blue-50 dark:bg-[#2C6E91]/15 px-2 py-1 rounded-lg">
+                      <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-lg">
                         Follow-up
                       </span>
                     </div>
@@ -400,8 +406,8 @@ function Calendar({ user }) {
                       <p className={`text-sm font-semibold ${ev.done ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
                         {ev.title}
                       </p>
-                      <span className={`text-[11px] font-semibold px-2 py-1 rounded-lg ${ev.done ? 'text-slate-500 bg-slate-200 dark:bg-slate-800' : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10'}`}>
-                        Reminder
+                      <span className={`text-[11px] font-bold px-2 py-1 rounded-lg ${ev.done ? 'text-slate-500 bg-slate-200 dark:bg-slate-800' : 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/20'}`}>
+                        {ev.done ? 'Done' : 'Reminder'}
                       </span>
                     </div>
 
