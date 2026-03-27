@@ -1,0 +1,70 @@
+.phone-frame {
+  width: 390px;
+  height: 844px;
+  /* IMPORTANT: frame background should be "hardware", not the app screen */
+  background-color: #ffffff;
+  border-radius: 40px;
+  border: 8px solid #333333;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.phone-notch {
+  width: 150px;
+  height: 28px;
+  background-color: #333333;
+  border-radius: 0 0 18px 18px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+/* The APP screen background should live here */
+.phone-content {
+  height: calc(100% - 28px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
+
+  background-color: #f7f9fc; /* <- light app background */
+}
+
+/* Thin scrollbar that doesn't eat space */
+.phone-content::-webkit-scrollbar {
+  width: 3px;
+}
+
+.phone-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.phone-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+/* ===== Dark mode overrides (NO layout changes) ===== */
+
+/* frame stays as "hardware" surround */
+html.dark .phone-frame {
+  background-color: #020617;
+  border-color: #0f172a;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+/* keep notch consistent with hardware */
+html.dark .phone-notch {
+  background-color: #0f172a;
+}
+
+/* app screen background in dark mode — must match dark:bg-slate-950 (#020617) */
+html.dark .phone-content {
+  background-color: #020617;
+}
+
+html.dark .phone-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
