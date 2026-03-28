@@ -10,9 +10,4 @@ Database: Firebase / SQL
 Authentication: JWT / Firebase Auth
 AI Development Tools: Claude, GitHub Copilot, ChatGPT
 
-Team Future Hires:
-Shady
-Abdikadir
-Abdirahman
-Yahye
 
