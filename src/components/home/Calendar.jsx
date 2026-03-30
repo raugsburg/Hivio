@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getApplicationsStorageKey, getRemindersStorageKey, safeReadJSON } from '../../utils/storage';
 
 function startOfDayISO(date) {
@@ -67,12 +67,13 @@ function nextHourTime() {
   return `${String(d.getHours()).padStart(2, '0')}:00`;
 }
 
-function Calendar({ user }) {
+function Calendar({ user, onNotify, onSchedule }) {
   const appsKey = useMemo(() => getApplicationsStorageKey(user), [user]);
   const remindersKey = useMemo(() => getRemindersStorageKey(user), [user]);
 
   const [apps, setApps] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const remindersLoaded = useRef(false);
 
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -87,15 +88,24 @@ function Calendar({ user }) {
     notes: '',
   });
 
+  const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setApps(safeReadJSON(appsKey, []));
+    remindersLoaded.current = false;
     setReminders(safeReadJSON(remindersKey, []));
   }, [appsKey, remindersKey]);
 
   useEffect(() => {
-    localStorage.setItem(remindersKey, JSON.stringify(reminders));
+    if (!remindersLoaded.current) {
+      remindersLoaded.current = true;
+      return;
+    }
+    try {
+      localStorage.setItem(remindersKey, JSON.stringify(reminders));
+    } catch {}
   }, [reminders, remindersKey]);
 
   const activeApps = apps.filter((a) => !a.archived);
@@ -144,7 +154,26 @@ function Calendar({ user }) {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   }
 
-  function addReminder() {
+  function startEdit(reminder) {
+    setEditingId(reminder.id);
+    setShowForm(true);
+    setForm({
+      title: reminder.title,
+      date: reminder.date,
+      time: reminder.time || '',
+      notes: reminder.notes || '',
+    });
+    setError('');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setShowForm(false);
+    setForm({ title: '', date: selectedDate, time: nextHourTime(), notes: '' });
+    setError('');
+  }
+
+  function saveReminder() {
     setError('');
     if (!form.title.trim()) {
       setError('Reminder title is required.');
@@ -155,19 +184,43 @@ function Calendar({ user }) {
       return;
     }
 
-    const next = {
-      id: `rem_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      title: form.title.trim(),
-      date: form.date,
-      time: form.time || '',
-      notes: form.notes.trim(),
-      done: false,
-      createdAt: new Date().toISOString(),
-    };
+    const today = startOfDayISO(new Date());
 
-    setReminders((prev) => [next, ...prev]);
-    setForm((prev) => ({ ...prev, title: '', notes: '', time: nextHourTime() }));
-    setSelectedDate(form.date);
+    if (editingId) {
+      const updated = { title: form.title.trim(), date: form.date, time: form.time || '', notes: form.notes.trim() };
+      setReminders((prev) =>
+        prev.map((r) => r.id === editingId ? { ...r, ...updated } : r)
+      );
+      setEditingId(null);
+      setSelectedDate(form.date);
+    } else {
+      const next = {
+        id: `rem_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        title: form.title.trim(),
+        date: form.date,
+        time: form.time || '',
+        notes: form.notes.trim(),
+        done: false,
+        createdAt: new Date().toISOString(),
+      };
+      setReminders((prev) => [next, ...prev]);
+      setSelectedDate(form.date);
+
+      // Immediately notify if reminder is for today
+      if (form.date === today && typeof onNotify === 'function') {
+        onNotify({
+          id: `reminder_created_${next.id}_${today}`,
+          type: 'reminder',
+          title: 'Reminder Set',
+          body: next.title,
+        });
+      }
+      // Schedule a timed popup if it has a future time
+      if (typeof onSchedule === 'function') onSchedule(next);
+    }
+
+    setShowForm(false);
+    setForm({ title: '', date: selectedDate, time: nextHourTime(), notes: '' });
   }
 
   function toggleReminderDone(reminderId) {
@@ -177,6 +230,7 @@ function Calendar({ user }) {
   }
 
   function deleteReminder(reminderId) {
+    if (editingId === reminderId) cancelEdit();
     setReminders((prev) => prev.filter((r) => r.id !== reminderId));
   }
 
@@ -186,7 +240,7 @@ function Calendar({ user }) {
   const title = 'text-slate-900 dark:text-slate-100';
 
   return (
-    <div className={`flex flex-col px-5 py-6 ${pageBg}`}>
+    <div className={`flex flex-col px-5 pt-6 pb-6 ${pageBg}`}>
       <div className="mb-5">
         <h1 className={`text-2xl font-bold tracking-tight ${title} mb-1`}>
           Calendar + Reminders
@@ -274,81 +328,112 @@ function Calendar({ user }) {
         </div>
       </div>
 
-      <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.15)] mb-4`}>
-        <div className="mb-3">
-          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Add Reminder</h2>
-          <p className="text-xs text-slate-400 mt-0.5 font-medium">Create personal reminders for deadlines, prep, and follow-ups.</p>
-        </div>
+      <div className={`${cardBg} rounded-2xl ${border} shadow-[0_2px_12px_rgba(0,0,0,0.15)] mb-4 overflow-hidden`}>
+        <button
+          type="button"
+          onClick={() => {
+            if (editingId) { cancelEdit(); return; }
+            setShowForm((prev) => !prev);
+            setError('');
+          }}
+          className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+              {editingId ? 'Edit Reminder' : 'Add Reminder'}
+            </h2>
+            {!showForm && !editingId && (
+              <p className="text-xs text-slate-400 mt-0.5 font-medium">Tap to create a new reminder</p>
+            )}
+          </div>
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+            showForm || editingId
+              ? 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+              : 'bg-[#2C6E91] text-white'
+          }`}>
+            {showForm || editingId ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            )}
+          </div>
+        </button>
 
-        {error && (
-          <div className="mb-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-xs font-semibold px-3 py-2">
-            {error}
+        {(showForm || editingId) && (
+          <div className="px-4 pb-4 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+            {error && (
+              <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-xs font-semibold px-3 py-2">
+                {error}
+              </div>
+            )}
+
+            <input
+              value={form.title}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="Reminder title"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl pl-3 pr-2 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-calendar-picker-indicator]:opacity-60"
+              />
+              <input
+                type="time"
+                value={form.time}
+                onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl pl-3 pr-2 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-calendar-picker-indicator]:opacity-60"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, time: '09:00' }))}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                9:00 AM
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, time: '13:00' }))}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                1:00 PM
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, time: '' }))}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                No time
+              </button>
+            </div>
+
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              placeholder="Optional notes"
+              rows={3}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            />
+
+            <button
+              type="button"
+              onClick={saveReminder}
+              className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl transition-colors"
+            >
+              {editingId ? 'Update Reminder' : 'Save Reminder'}
+            </button>
           </div>
         )}
-
-        <div className="space-y-2">
-          <input
-            value={form.title}
-            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Reminder title"
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert"
-            />
-            <input
-              type="time"
-              value={form.time}
-              onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setForm((prev) => ({ ...prev, time: '09:00' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              9:00 AM
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm((prev) => ({ ...prev, time: '13:00' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              1:00 PM
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm((prev) => ({ ...prev, time: '' }))}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              No time
-            </button>
-          </div>
-
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-            placeholder="Optional notes"
-            rows={3}
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-          />
-
-          <button
-            type="button"
-            onClick={addReminder}
-            className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl transition-colors"
-          >
-            Save Reminder
-          </button>
-        </div>
       </div>
 
       <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.15)]`}>
@@ -394,7 +479,7 @@ function Calendar({ user }) {
                     </div>
 
                     <p className="text-xs text-slate-500 dark:text-slate-300 mt-1">
-                      {formatTimeLabel(ev.time)} • {ev.notes || 'No notes'}
+                      {formatTimeLabel(ev.time)}{ev.notes ? ` • ${ev.notes}` : ''}
                     </p>
 
                     <div className="flex items-center gap-2 mt-2">
@@ -404,6 +489,13 @@ function Calendar({ user }) {
                         className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                       >
                         {ev.done ? 'Mark Active' : 'Mark Done'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(reminders.find((r) => r.id === ev.id))}
+                        className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-[#2C6E91] hover:bg-blue-50 dark:hover:bg-[#2C6E91]/10"
+                      >
+                        Edit
                       </button>
                       <button
                         type="button"
@@ -421,7 +513,6 @@ function Calendar({ user }) {
         )}
       </div>
 
-      <div className="h-4" />
     </div>
   );
 }

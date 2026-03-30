@@ -22,11 +22,11 @@ function Toast({ toast, onDismiss }) {
   return (
     <div
       style={{
-        transform: visible ? 'translateY(0)' : 'translateY(-12px)',
+        transform: visible ? 'translateY(0)' : 'translateY(-16px)',
         opacity: visible ? 1 : 0,
-        transition: 'transform 0.25s ease, opacity 0.25s ease',
+        transition: 'transform 0.3s ease, opacity 0.3s ease',
       }}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] px-4 py-3 flex items-start gap-3"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 border-t-2 border-t-[#2C6E91] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] px-4 py-3.5 flex items-start gap-3"
     >
       {/* Icon */}
       <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-0.5 ${
@@ -73,11 +73,9 @@ export default function NotificationToast({ toasts, onDismiss }) {
   if (!toasts.length) return null;
 
   return (
-    <div className="absolute top-3 left-3 right-3 z-[100] flex flex-col gap-2 pointer-events-none">
+    <div className="sticky top-0 z-[100] px-3 pt-3 pb-1 flex flex-col gap-2">
       {toasts.map((toast) => (
-        <div key={toast.id} className="pointer-events-auto">
-          <Toast toast={toast} onDismiss={onDismiss} />
-        </div>
+        <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
     </div>
   );

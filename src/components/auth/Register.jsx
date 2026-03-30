@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import bcrypt from 'bcryptjs';
+import { saveUser } from '../../utils/storage';
 
 function Register({ onRegistrationComplete, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -57,7 +58,7 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
       createdAt: new Date().toISOString()
     };
 
-    localStorage.setItem('hivio_user', JSON.stringify(userData));
+    saveUser(userData);
     onRegistrationComplete(userData);
   }
 
@@ -66,7 +67,7 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
 
   return (
     <div className="flex flex-col min-h-screen px-8 py-10 bg-[#F7F9FC] dark:bg-slate-950 relative">
-      <div className="flex flex-col mb-10 mt-16">
+      <div className="flex flex-col items-center text-center mb-10 mt-16">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Create Account</h1>
         <p className="text-slate-500 dark:text-slate-300 font-medium leading-relaxed">
           Join Hivio and get your job search organized today.

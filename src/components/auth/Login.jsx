@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import bcrypt from 'bcryptjs';
+import { getUser, saveUser } from '../../utils/storage';
 
 function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -32,25 +33,23 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
       formData.email.trim().toLowerCase() === DEV_EMAIL.toLowerCase() &&
       formData.password === DEV_PASSWORD
     ) {
-      const devUser = {
-        email: DEV_EMAIL,
-        password: 'DEV_LOCALHOST_BYPASS',
-        profile: { firstName: 'Test', lastName: 'User' },
-      };
-      localStorage.setItem('hivio_user', JSON.stringify(devUser));
+      let devUser = getUser(DEV_EMAIL);
+      if (!devUser) {
+        devUser = {
+          name: 'Test User',
+          email: DEV_EMAIL,
+          password: 'DEV_LOCALHOST_BYPASS',
+          createdAt: new Date().toISOString(),
+        };
+        saveUser(devUser);
+      }
       onLogin(devUser);
       return;
     }
 
-    const stored = localStorage.getItem('hivio_user');
-    if (!stored) {
+    const user = getUser(formData.email.trim());
+    if (!user) {
       setError('No account found. Please register first.');
-      return;
-    }
-
-    const user = JSON.parse(stored);
-    if (user.email.toLowerCase() !== formData.email.trim().toLowerCase()) {
-      setError('Invalid email or password');
       return;
     }
 

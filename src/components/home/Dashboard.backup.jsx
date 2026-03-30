@@ -183,6 +183,7 @@ function ApplicationFunnel({ applied, interview, offer, onSelect }) {
         const widthPct = Math.max(10, Math.round((r.value / max) * 100));
         const prev = rows[i - 1];
         const convRate = prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null;
+        const marginPct = (100 - widthPct) / 2;
 
         return (
           <button
@@ -268,21 +269,6 @@ function ResumeOutcomeDonut({ data }) {
   );
 }
 
-function HealthBar({ label, score, max, color, detail }) {
-  const pct = Math.round((score / max) * 100);
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300">{detail}</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
-    </div>
-  );
-}
-
 function Dashboard({ user, onTabChange }) {
   const widgets = user.dashboardWidgets || {
     statusBreakdown: true,
@@ -301,7 +287,6 @@ function Dashboard({ user, onTabChange }) {
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
-  const [staleAlertDismissed, setStaleAlertDismissed] = useState(false);
 
   useEffect(() => {
     setApps(safeReadJSON(appsKey, []));
@@ -424,56 +409,6 @@ function Dashboard({ user, onTabChange }) {
     .slice(0, 3);
 
   const firstName = user?.name?.split(' ')?.[0] || 'there';
-
-  // ── Analytical computations ───────────────────────────────────────────────
-
-  const WEEKLY_GOAL = 5;
-
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  weekStart.setHours(0, 0, 0, 0);
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(weekStart.getDate() - 7);
-
-  const thisWeekCount = activeApps.filter((a) => {
-    return new Date(a.createdAt || a.date || 0) >= weekStart;
-  }).length;
-
-  const lastWeekCount = activeApps.filter((a) => {
-    const d = new Date(a.createdAt || a.date || 0);
-    return d >= lastWeekStart && d < weekStart;
-  }).length;
-
-  const velocityDelta = thisWeekCount - lastWeekCount;
-
-  const staleApps = activeApps.filter((a) => {
-    if (a.status !== 'Applied' || a.followUpDate) return false;
-    const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
-    return ageDays > 14;
-  });
-
-  const appsNeedingCoverage = activeApps.filter(
-    (a) => a.status === 'Applied' || a.status === 'Interview'
-  );
-  const followUpCoverage =
-    appsNeedingCoverage.length > 0
-      ? appsNeedingCoverage.filter((a) => a.followUpDate).length / appsNeedingCoverage.length
-      : 1;
-
-  // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
-  const healthActivity = Math.min(35, Math.round((thisWeekCount / WEEKLY_GOAL) * 35));
-  const healthConversion =
-    counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 20) * 35)) : 0;
-  const healthCoverage = Math.round(followUpCoverage * 30);
-  const healthScore = healthActivity + healthConversion + healthCoverage;
-  const healthLabel =
-    healthScore >= 80 ? 'Strong' : healthScore >= 60 ? 'Active' : healthScore >= 40 ? 'Slow' : 'Stalled';
-  const healthColor =
-    healthScore >= 80 ? '#0F766E' : healthScore >= 60 ? '#2C6E91' : healthScore >= 40 ? '#D97706' : '#ef4444';
-
-  const daysLeftInWeek = 7 - today.getDay();
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   function exportCSV() {
     if (activeApps.length === 0) return;
@@ -712,20 +647,7 @@ function Dashboard({ user, onTabChange }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">Application Snapshot</p>
-            <div className="flex items-baseline gap-2 mt-2">
-              <p className="text-3xl leading-none font-black text-slate-900 dark:text-slate-100">{counts.total}</p>
-              {thisWeekCount > 0 && (
-                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-lg ${
-                  velocityDelta > 0
-                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                    : velocityDelta < 0
-                    ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                }`}>
-                  {velocityDelta > 0 ? '+' : ''}{velocityDelta !== 0 ? velocityDelta : '='} this week
-                </span>
-              )}
-            </div>
+            <p className="text-3xl leading-none font-black text-slate-900 dark:text-slate-100 mt-2">{counts.total}</p>
             <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mt-1">Active applications</p>
           </div>
           <button
@@ -777,32 +699,6 @@ function Dashboard({ user, onTabChange }) {
                   { id: 'Rejected', label: 'Rejected', value: rejectedCount, color: '#64748B' },
                 ]}
               />
-              {staleApps.length > 0 && !staleAlertDismissed && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/25">
-                  <button
-                    type="button"
-                    onClick={() => navigateToApplicationsWithStatus('Applied')}
-                    className="flex items-center gap-2 flex-1 text-left"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                      {staleApps.length} app{staleApps.length !== 1 ? 's' : ''} sitting in Applied for 14+ days — consider following up
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStaleAlertDismissed(true)}
-                    className="flex-shrink-0 text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors"
-                    aria-label="Dismiss"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-              )}
             </div>
           );
         }
@@ -830,14 +726,6 @@ function Dashboard({ user, onTabChange }) {
                 offer={offerCount}
                 onSelect={navigateToApplicationsWithStatus}
               />
-              {counts.total >= 5 && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className={`text-xs font-bold ${interviewRate >= 20 ? 'text-teal-600 dark:text-teal-300' : interviewRate >= 10 ? 'text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-300'}`}>
-                    {interviewRate >= 20 ? 'Above average' : interviewRate >= 10 ? 'Near average' : 'Below average'}
-                  </span>
-                  <span className="text-[10px] text-slate-400">Typical interview rate is 10–20%</span>
-                </div>
-              )}
             </div>
           );
         }
@@ -850,18 +738,9 @@ function Dashboard({ user, onTabChange }) {
                   <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
                     Weekly Activity
                   </h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-slate-400">{thisWeekCount} apps this week</p>
-                    {lastWeekCount > 0 && (
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                        velocityDelta > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-                        : velocityDelta < 0 ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-300'
-                        : 'text-slate-400'
-                      }`}>
-                        {velocityDelta > 0 ? '+' : ''}{velocityDelta} vs last week
-                      </span>
-                    )}
-                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    New applications in the last 7 days.
+                  </p>
                 </div>
               </div>
               <ActivityLineChart days={last7} values={activityValues} />
@@ -1040,81 +919,6 @@ function Dashboard({ user, onTabChange }) {
                   ))}
                 </div>
               )}
-            </div>
-          );
-        }
-
-        if (widgetId === 'pipelineHealth' && widgets.pipelineHealth) {
-          const isEmpty = counts.total < 3;
-          return (
-            <div key="pipelineHealth" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
-              <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase mb-3">
-                Pipeline Health
-              </h2>
-              {isEmpty ? (
-                <p className="text-xs text-slate-400">Add at least 3 applications to see your health score.</p>
-              ) : (
-                <>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="text-5xl font-black leading-none" style={{ color: healthColor }}>{healthScore}</div>
-                    <div>
-                      <p className="text-base font-black" style={{ color: healthColor }}>{healthLabel}</p>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">out of 100</p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <HealthBar label="Activity" score={healthActivity} max={35} color="#2C6E91"
-                      detail={`${thisWeekCount} of ${WEEKLY_GOAL} apps this week`} />
-                    <HealthBar label="Conversion" score={healthConversion} max={35} color="#0F766E"
-                      detail={`${interviewRate}% interview rate`} />
-                    <HealthBar label="Follow-up Coverage" score={healthCoverage} max={30} color="#D97706"
-                      detail={`${Math.round(followUpCoverage * 100)}% of active apps covered`} />
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        }
-
-        if (widgetId === 'weeklyGoal' && widgets.weeklyGoal) {
-          const overGoal = Math.max(0, thisWeekCount - WEEKLY_GOAL);
-          const dots = WEEKLY_GOAL;
-          const filled = Math.min(thisWeekCount, WEEKLY_GOAL);
-          const pct = Math.min(100, Math.round((thisWeekCount / WEEKLY_GOAL) * 100));
-          return (
-            <div key="weeklyGoal" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">Weekly Goal</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {daysLeftInWeek === 7 ? 'Full week ahead' : `${daysLeftInWeek} day${daysLeftInWeek !== 1 ? 's' : ''} left this week`}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-slate-900 dark:text-slate-100">{thisWeekCount}</span>
-                  <span className="text-sm font-semibold text-slate-400"> / {WEEKLY_GOAL}</span>
-                  {overGoal > 0 && (
-                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-300">+{overGoal} over goal!</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1.5 mb-2">
-                {Array.from({ length: dots }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`flex-1 h-2.5 rounded-full transition-all ${i < filled ? '' : 'bg-slate-100 dark:bg-slate-800'}`}
-                    style={i < filled ? { backgroundColor: '#2C6E91' } : undefined}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold text-slate-400">{pct}% complete</p>
-                {velocityDelta !== 0 && lastWeekCount > 0 && (
-                  <p className={`text-[10px] font-semibold ${velocityDelta > 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'}`}>
-                    {velocityDelta > 0 ? '+' : ''}{velocityDelta} vs last week
-                  </p>
-                )}
-              </div>
             </div>
           );
         }

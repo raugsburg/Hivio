@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const careerInterests = [
   'Software Engineering', 'Product Management', 'Data Science',
   'UX Design', 'Marketing', 'Finance', 'Consulting',
@@ -8,6 +6,8 @@ export const careerInterests = [
 ];
 
 export const DEFAULT_DASHBOARD_WIDGETS = {
+  pipelineHealth: true,
+  weeklyGoal: true,
   statusBreakdown: true,
   weeklyActivity: true,
   interviewsLanded: true,
@@ -16,9 +16,52 @@ export const DEFAULT_DASHBOARD_WIDGETS = {
   rejectionRate: false
 };
 
+// Order of widget slots on the Dashboard (includes split interviewsLanded sections)
+export const DEFAULT_DASHBOARD_ORDER = [
+  'pipelineHealth',
+  'weeklyGoal',
+  'statusBreakdown',
+  'applicationFunnel',
+  'weeklyActivity',
+  'resumePerformance',
+  'upcomingTasks',
+  'recentApps',
+];
+
+export const DASHBOARD_ORDER_LABELS = {
+  pipelineHealth:     { label: 'Pipeline Health',         controlledBy: 'pipelineHealth' },
+  weeklyGoal:         { label: 'Weekly Goal',             controlledBy: 'weeklyGoal' },
+  statusBreakdown:    { label: 'Application Status',      controlledBy: 'statusBreakdown' },
+  applicationFunnel:  { label: 'Application Funnel',      controlledBy: 'interviewsLanded' },
+  weeklyActivity:     { label: 'Weekly Activity',         controlledBy: 'weeklyActivity' },
+  resumePerformance:  { label: 'Resume Performance',      controlledBy: 'interviewsLanded' },
+  upcomingTasks:      { label: 'Upcoming Follow-ups',     controlledBy: 'upcomingTasks' },
+  recentApps:         { label: 'Recent Applications',     controlledBy: 'recentApps' },
+};
+
 // Removed "Response Rate" from dashboard personalization,
 // so users don't toggle a widget that isn't implemented on Dashboard.
 export const dashboardWidgets = [
+  {
+    id: 'pipelineHealth',
+    label: 'Pipeline Health',
+    desc: 'A score (0-100) measuring your search activity, conversion, and follow-up coverage.',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+    )
+  },
+  {
+    id: 'weeklyGoal',
+    label: 'Weekly Goal',
+    desc: 'Track progress toward your weekly application target.',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+      </svg>
+    )
+  },
   {
     id: 'statusBreakdown',
     label: 'Application Status',

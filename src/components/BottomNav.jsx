@@ -62,11 +62,7 @@ function BottomNav({ activeTab, onTabChange }) {
                 : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
             }`}
           >
-            <div className={`${
-              activeTab === tab.id
-                ? 'bg-blue-50 dark:bg-[#2C6E91]/10 text-[#2C6E91] rounded-full p-2 -mt-1'
-                : 'p-1'
-            }`}>
+            <div className="p-1">
               {tab.icon}
             </div>
             <span className={`text-[10px] ${
@@ -74,6 +70,9 @@ function BottomNav({ activeTab, onTabChange }) {
             }`}>
               {tab.label}
             </span>
+            <span className={`w-1 h-1 rounded-full transition-all duration-200 ${
+              activeTab === tab.id ? 'bg-[#2C6E91]' : 'bg-transparent'
+            }`} />
           </button>
         ))}
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey } from '../../utils/storage';
+import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
 
 function scrollAppContainerToTop() {
   const el = document.getElementById('app-scroll-container');
@@ -7,29 +7,19 @@ function scrollAppContainerToTop() {
 }
 
 function readApps(storageKey) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return safeReadJSON(storageKey, []);
 }
 
 function writeApps(storageKey, apps) {
-  localStorage.setItem(storageKey, JSON.stringify(apps));
+  return safeWriteJSON(storageKey, apps);
 }
 
 function readResumes(storageKey) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return safeReadJSON(storageKey, []);
 }
 
 function writeResumes(storageKey, resumes) {
-  localStorage.setItem(storageKey, JSON.stringify(resumes));
+  safeWriteJSON(storageKey, resumes);
 }
 
 /* Constants */
@@ -169,7 +159,8 @@ function Applications({ user }) {
 
   function persistApps(next) {
     setApps(next);
-    writeApps(appsStorageKey, next);
+    const ok = writeApps(appsStorageKey, next);
+    if (!ok) setError('Save failed — storage may be full. Try removing large resume files.');
   }
 
   function persistResumes(next) {
@@ -209,6 +200,43 @@ function Applications({ user }) {
     if (!resumeId) return '';
     const r = resumes.find((x) => x.id === resumeId);
     return r ? r.label || r.fileName : 'Selected resume';
+  }
+
+  function exportToCSV() {
+    const activeApps = apps.filter((a) => !a.archived);
+    if (activeApps.length === 0) return;
+
+    const headers = ['Company', 'Job Title', 'Status', 'Date Applied', 'Follow-up Date', 'Location', 'Resume', 'Notes'];
+    const rows = activeApps.map((a) => [
+      a.company || '',
+      a.title || '',
+      a.status || '',
+      a.date || '',
+      a.followUpDate || '',
+      a.location || '',
+      resumeLabelById(a.resumeId),
+      a.notes || '',
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    try {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hivio_applications_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSuccess('Applications exported successfully.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Export failed. Please try again.');
+    }
   }
 
   function openAdd() {
@@ -569,6 +597,18 @@ function Applications({ user }) {
         >
           {showArchived ? '✓ Show Archived' : 'Show Archived'}
           {archivedApps.length ? ` (${archivedApps.length})` : ''}
+        </button>
+
+        <button
+          type="button"
+          onClick={exportToCSV}
+          disabled={apps.filter((a) => !a.archived).length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export CSV
         </button>
       </div>
 

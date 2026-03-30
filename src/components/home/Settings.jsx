@@ -2,51 +2,123 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AutocompleteInput from '../common/Autocompleteinput';
 import { MN_SCHOOLS } from '../../data/schools-mn';
 import { COMMON_MAJORS } from '../../data/majors';
-import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS } from '../../data/constants';
-
-function getUserStorageKey() {
-  return 'hivio_user';
-}
-
-function safeReadUser() {
-  try {
-    const raw = localStorage.getItem(getUserStorageKey());
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function safeWriteUser(nextUser) {
-  localStorage.setItem(getUserStorageKey(), JSON.stringify(nextUser));
-}
+import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS, DEFAULT_DASHBOARD_ORDER, DASHBOARD_ORDER_LABELS } from '../../data/constants';
+import { getUser, saveUser } from '../../utils/storage';
+import { getStoredTheme, storeTheme, applyThemeClass } from '../../utils/theme';
 
 function normalizeText(s) {
   return (s || '').trim().replace(/\s+/g, ' ');
 }
 
-function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggleNotifications }) {
+function FeedbackCard({ user }) {
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hovered, setHovered] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  function submit() {
+    if (!rating) return;
+    const entry = {
+      id: `fb_${Date.now()}`,
+      email: user?.email || 'anonymous',
+      rating,
+      comment: comment.trim(),
+      submittedAt: new Date().toISOString(),
+    };
+    try {
+      const key = 'hivio_feedback';
+      const prev = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify([entry, ...prev]));
+    } catch {}
+    setSubmitted(true);
+    setTimeout(() => { setOpen(false); setSubmitted(false); setRating(0); setComment(''); }, 2000);
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 overflow-hidden mb-6">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
+      >
+        <div>
+          <p className="font-semibold text-slate-700 dark:text-slate-200 text-left">Share Feedback</p>
+          <p className="text-xs text-slate-400 mt-0.5 text-left">Report a bug or share what's working</p>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-300 dark:text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`}>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          {submitted ? (
+            <div className="text-center py-4">
+              <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Thanks for your feedback!</p>
+              <p className="text-xs text-slate-400 mt-1">It helps us build a better experience.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">How would you rate Hivio?</p>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHovered(star)}
+                      onMouseLeave={() => setHovered(0)}
+                      className="text-2xl transition-transform hover:scale-110"
+                      aria-label={`${star} star`}
+                    >
+                      <span className={(hovered || rating) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700'}>★</span>
+                    </button>
+                  ))}
+                  {rating > 0 && (
+                    <span className="text-xs font-semibold text-slate-400 ml-2">
+                      {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][rating]}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Any comments or suggestions? (optional)"
+                rows={3}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all resize-none"
+              />
+
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!rating}
+                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+              >
+                Submit Feedback
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggleNotifications, onTabChange }) {
   const [view, setView] = useState('main'); // main | account | dashboard
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
 
   // ---- Dark mode state + helpers ----
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem('hivio_theme') || 'light';
-    } catch {
-      return 'light';
-    }
-  });
+  const [theme, setTheme] = useState(() => getStoredTheme());
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
-
-    try {
-      localStorage.setItem('hivio_theme', theme);
-    } catch {
-      // ignore
-    }
+    storeTheme(theme);
+    applyThemeClass(theme);
   }, [theme]);
 
   function toggleTheme() {
@@ -74,7 +146,10 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       interests: Array.isArray(user?.profile?.interests) ? user.profile.interests : [],
 
       // dashboard widgets
-      dashboardWidgets: user?.dashboardWidgets || { ...DEFAULT_DASHBOARD_WIDGETS }
+      dashboardWidgets: user?.dashboardWidgets || { ...DEFAULT_DASHBOARD_WIDGETS },
+
+      // dashboard widget order
+      dashboardOrder: Array.isArray(user?.dashboardOrder) ? [...user.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER]
     };
   }, [user]);
 
@@ -153,10 +228,42 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
     }));
   }
 
+
+  function handleDragStart(idx) {
+    setDragIdx(idx);
+  }
+
+  function handleDragOver(e, idx) {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  }
+
+  function handleDrop(idx) {
+    if (dragIdx === null || dragIdx === idx) {
+      setDragIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+    setForm((prev) => {
+      const order = [...(prev.dashboardOrder || DEFAULT_DASHBOARD_ORDER)];
+      const dragged = order.splice(dragIdx, 1)[0];
+      order.splice(idx, 0, dragged);
+      return { ...prev, dashboardOrder: order };
+    });
+    setDragIdx(null);
+    setDragOverIdx(null);
+  }
+
+  function handleDragEnd() {
+    setDragIdx(null);
+    setDragOverIdx(null);
+  }
+
   function resetWidgetsToDefaults() {
     setForm((prev) => ({
       ...prev,
-      dashboardWidgets: { ...DEFAULT_DASHBOARD_WIDGETS }
+      dashboardWidgets: { ...DEFAULT_DASHBOARD_WIDGETS },
+      dashboardOrder: [...DEFAULT_DASHBOARD_ORDER],
     }));
   }
 
@@ -169,7 +276,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   }
 
   function persistUserAndUpdateState(updatedUser) {
-    safeWriteUser(updatedUser);
+    saveUser(updatedUser);
     if (typeof onUpdateUser === 'function') onUpdateUser(updatedUser);
   }
 
@@ -183,7 +290,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       return;
     }
 
-    const storedUser = safeReadUser();
+    const storedUser = getUser(user.email);
     if (!storedUser) {
       setError('No stored user found. Please log out and log back in.');
       return;
@@ -216,7 +323,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
     setError('');
     setSuccess('');
 
-    const storedUser = safeReadUser();
+    const storedUser = getUser(user.email);
     if (!storedUser) {
       setError('No stored user found. Please log out and log back in.');
       return;
@@ -227,7 +334,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       dashboardWidgets: {
         ...(storedUser.dashboardWidgets || {}),
         ...(form.dashboardWidgets || {})
-      }
+      },
+      dashboardOrder: Array.isArray(form.dashboardOrder) ? [...form.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER],
     };
 
     try {
@@ -532,6 +640,59 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           </div>
         </div>
 
+        <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Widget Order</p>
+          <p className="text-xs text-slate-400 mb-3">
+            Drag to reorder widgets on your dashboard.
+          </p>
+
+          <div className="space-y-1.5">
+            {(form.dashboardOrder || DEFAULT_DASHBOARD_ORDER).map((id, idx) => {
+              const meta = DASHBOARD_ORDER_LABELS[id];
+              if (!meta) return null;
+              const isEnabled = Boolean(form.dashboardWidgets?.[meta.controlledBy]);
+              const isDragging = dragIdx === idx;
+              const isOver = dragOverIdx === idx && dragIdx !== idx;
+              return (
+                <div
+                  key={id}
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDrop={() => handleDrop(idx)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-grab active:cursor-grabbing transition-all ${
+                    isDragging
+                      ? 'opacity-40 border-dashed border-slate-300 dark:border-slate-600'
+                      : isOver
+                      ? 'border-[#2C6E91] bg-blue-50/40 dark:bg-[#2C6E91]/10 shadow-sm'
+                      : isEnabled
+                      ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
+                      : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-50'
+                  }`}
+                >
+                  <svg
+                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round"
+                    className="text-slate-300 dark:text-slate-600 flex-shrink-0 pointer-events-none"
+                  >
+                    <line x1="8" y1="6" x2="16" y2="6" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                    <line x1="8" y1="18" x2="16" y2="18" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-slate-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
+                  <span className={`flex-1 text-sm font-semibold ${isEnabled ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                    {meta.label}
+                  </span>
+                  {!isEnabled && (
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">off</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex gap-3">
           <button
             type="button"
@@ -610,6 +771,25 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           </svg>
         </button>
 
+        {/* Developer Console — dev account only */}
+        {user.email?.toLowerCase() === 'test@hivio.local' && (
+          <button
+            type="button"
+            onClick={() => typeof onTabChange === 'function' && onTabChange('dev')}
+            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800 min-h-[44px]"
+          >
+            <span className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200">
+              Developer Console
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                Dev
+              </span>
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
+
         {/* Appearance toggle */}
         <button
           type="button"
@@ -664,6 +844,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           </div>
         </button>
       </div>
+
+      <FeedbackCard user={user} />
 
       <button
         onClick={onLogout}

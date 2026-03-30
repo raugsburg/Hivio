@@ -3,6 +3,8 @@ import AutocompleteInput from '../common/Autocompleteinput';
 import { MN_SCHOOLS } from '../../data/schools-mn';
 import { COMMON_MAJORS } from '../../data/majors';
 import { careerInterests, dashboardWidgets } from '../../data/constants';
+import { getUser, saveUser } from '../../utils/storage';
+import { getStoredTheme, applyThemeClass } from '../../utils/theme';
 
 function normalizeText(s) {
   return (s || '').trim().replace(/\s+/g, ' ');
@@ -26,22 +28,13 @@ function ProfileSetup({ user, onProfileComplete }) {
     interviewsLanded: true,
     upcomingTasks: true,
     recentApps: true,
+    rejectionRate: false,
   });
 
-  // ---- NEW: read + apply saved theme so onboarding matches Settings ----
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem('hivio_theme') || 'light';
-    } catch {
-      return 'light';
-    }
-  });
-
+  // Apply saved theme so onboarding matches Settings
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
-  }, [theme]);
+    applyThemeClass(getStoredTheme());
+  }, []);
 
   const gradYearOptions = useMemo(() => {
     const start = new Date().getFullYear(); // 2026 right now
@@ -87,10 +80,8 @@ function ProfileSetup({ user, onProfileComplete }) {
   }
 
   function handleSave() {
-    const stored = localStorage.getItem('hivio_user');
+    const stored = getUser(user.email);
     if (stored) {
-      const userData = JSON.parse(stored);
-
       const normalizedProfile = {
         ...profile,
         school: normalizeText(profile.school),
@@ -99,13 +90,13 @@ function ProfileSetup({ user, onProfileComplete }) {
       };
 
       const updatedUser = {
-        ...userData,
+        ...stored,
         profile: normalizedProfile,
         avatarUrl: avatarPreview || null,
-        dashboardWidgets: widgets
+        dashboardWidgets: widgets,
       };
 
-      localStorage.setItem('hivio_user', JSON.stringify(updatedUser));
+      saveUser(updatedUser);
       onProfileComplete(updatedUser);
     }
   }

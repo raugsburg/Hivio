@@ -17,7 +17,9 @@ function readResumesFromStorage(storageKey) {
 }
 
 function writeResumesToStorage(storageKey, resumes) {
-  localStorage.setItem(storageKey, JSON.stringify(resumes));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(resumes));
+  } catch {}
 }
 
 function formatBytes(bytes) {
