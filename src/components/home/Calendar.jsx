@@ -1,15 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getApplicationsStorageKey, getRemindersStorageKey, safeReadJSON } from '../../utils/storage';
-
-function startOfDayISO(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
-}
-
-function isValidDateStringYYYYMMDD(s) {
-  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+import { startOfDayISO, isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 
 function monthLabel(d) {
   return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -492,7 +483,7 @@ function Calendar({ user, onNotify, onSchedule }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => startEdit(reminders.find((r) => r.id === ev.id))}
+                        onClick={() => { const r = reminders.find((rem) => rem.id === ev.id); if (r) startEdit(r); }}
                         className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-slate-700 text-[#2C6E91] hover:bg-blue-50 dark:hover:bg-[#2C6E91]/10"
                       >
                         Edit

@@ -1,16 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON } from '../../utils/storage';
+import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
 import { DEFAULT_DASHBOARD_ORDER } from '../../data/constants';
+import { startOfDayISO, isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 
-function startOfDayISO(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
-}
-
-function isValidDateStringYYYYMMDD(s) {
-  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+const WEEKLY_GOAL = 5;
 
 function statusBadgeClasses(status) {
   switch (status) {
@@ -175,42 +168,45 @@ function ApplicationFunnel({ applied, interview, offer, onSelect }) {
     { id: 'Interview', label: 'Interview', value: interview, color: '#0F766E' },
     { id: 'Offer', label: 'Offer', value: offer, color: '#D97706' },
   ];
-  const max = Math.max(1, applied);
+  const max = Math.max(1, applied, interview, offer);
 
   return (
-    <div className="space-y-2">
+    <div>
       {rows.map((r, i) => {
-        const widthPct = Math.max(10, Math.round((r.value / max) * 100));
+        const pct = Math.round((r.value / max) * 100);
         const prev = rows[i - 1];
         const convRate = prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null;
 
         return (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => onSelect(r.id)}
-            className="w-full text-left group"
-          >
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 w-16 flex-shrink-0">{r.label}</span>
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{r.value}</span>
-              {convRate !== null && (
-                <span className="text-[10px] font-semibold text-slate-400 ml-auto">
-                  {convRate}% conv.
-                </span>
-              )}
-            </div>
-            {/* Centered bar — no track, negative space creates the funnel shape */}
-            <div className="h-7 flex items-center justify-center">
-              <div
-                className="h-full rounded-xl"
-                style={{
-                  width: `${widthPct}%`,
-                  background: `linear-gradient(90deg, ${r.color}F0, ${r.color}B0)`,
-                }}
-              />
-            </div>
-          </button>
+          <div key={r.id}>
+            {convRate !== null && (
+              <div className="flex items-center gap-1.5 px-1 py-1.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600 flex-shrink-0">
+                  <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                </svg>
+                <span className="text-[10px] font-semibold text-slate-400">{convRate}% moved forward</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelect(r.id)}
+              className="w-full text-left rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{r.label}</span>
+                </div>
+                <span className="text-sm font-black text-slate-800 dark:text-slate-100">{r.value}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${r.value > 0 ? Math.max(pct, 3) : 0}%`, backgroundColor: r.color }}
+                />
+              </div>
+            </button>
+          </div>
         );
       })}
     </div>
@@ -287,7 +283,7 @@ function Dashboard({ user, onTabChange }) {
   const widgets = user.dashboardWidgets || {
     statusBreakdown: true,
     weeklyActivity: true,
-    interviewsLanded: true,
+    applicationFunnel: true,
     upcomingTasks: true,
     recentApps: true,
     rejectionRate: false,
@@ -301,66 +297,222 @@ function Dashboard({ user, onTabChange }) {
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
-  const [staleAlertDismissed, setStaleAlertDismissed] = useState(false);
+
+  const dismissedStaleKey = `hivio_dismissed_stale_${user?.email?.toLowerCase() || 'anon'}`;
+  const [dismissedStaleIds, setDismissedStaleIds] = useState(() => safeReadJSON(dismissedStaleKey, []));
 
   useEffect(() => {
     setApps(safeReadJSON(appsKey, []));
     setResumes(safeReadJSON(resumesKey, []));
   }, [appsKey, resumesKey]);
 
-  const activeApps = apps.filter((a) => !a.archived);
-
-  const counts = activeApps.reduce(
-    (acc, a) => {
-      const s = a.status || 'Applied';
-      acc.total += 1;
-      acc.byStatus[s] = (acc.byStatus[s] || 0) + 1;
-      return acc;
-    },
-    { total: 0, byStatus: {} }
-  );
-
-  const appliedCount = counts.byStatus.Applied || 0;
-  const interviewCount = counts.byStatus.Interview || 0;
-  const offerCount = counts.byStatus.Offer || 0;
-  const rejectedCount = counts.byStatus.Rejected || 0;
-
-  const interviewsLanded = interviewCount + offerCount;
-  const interviewRate = counts.total ? Math.round((interviewsLanded / counts.total) * 100) : 0;
-  const offerRate = counts.total ? Math.round((offerCount / counts.total) * 100) : 0;
-
   const today = new Date();
-  const last7 = Array.from({ length: 7 }).map((_, idx) => {
-    const d = new Date();
-    d.setDate(today.getDate() - (6 - idx));
-    return d;
-  });
+  const daysLeftInWeek = 7 - today.getDay();
 
-  const last7Keys = last7.map((d) => startOfDayISO(d));
-  const activityByDay = Object.fromEntries(last7Keys.map((k) => [k, 0]));
+  const {
+    activeApps,
+    counts,
+    appliedCount,
+    interviewCount,
+    offerCount,
+    rejectedCount,
+    interviewsLanded,
+    interviewRate,
+    offerRate,
+    last7,
+    last7Keys,
+    activityValues,
+    upcomingFollowups,
+    recentApps,
+    resumeStats,
+    resumeFeedback,
+    thisWeekCount,
+    lastWeekCount,
+    velocityDelta,
+    staleApps,
+    followUpCoverage,
+    healthScore,
+    healthLabel,
+    healthColor,
+  } = useMemo(() => {
+    const now = new Date();
+    const activeApps = apps.filter((a) => !a.archived);
 
-  activeApps.forEach((a) => {
-    const raw = a.createdAt || a.date;
-    if (!raw) return;
-    const key = startOfDayISO(raw);
-    if (activityByDay[key] !== undefined) activityByDay[key] += 1;
-  });
+    const counts = activeApps.reduce(
+      (acc, a) => {
+        const s = a.status || 'Applied';
+        acc.total += 1;
+        acc.byStatus[s] = (acc.byStatus[s] || 0) + 1;
+        return acc;
+      },
+      { total: 0, byStatus: {} }
+    );
 
-  const activityValues = last7Keys.map((k) => activityByDay[k] || 0);
+    const appliedCount = counts.byStatus.Applied || 0;
+    const interviewCount = counts.byStatus.Interview || 0;
+    const offerCount = counts.byStatus.Offer || 0;
+    const rejectedCount = counts.byStatus.Rejected || 0;
 
-  const upcomingFollowups = activeApps
-    .filter((a) => isValidDateStringYYYYMMDD(a.followUpDate))
-    .map((a) => ({
-      ...a,
-      followUpDateObj: new Date(`${a.followUpDate}T00:00:00`),
-    }))
-    .filter(
-      (a) =>
-        a.followUpDateObj >=
-        new Date(startOfDayISO(new Date()) + 'T00:00:00')
+    const interviewsLanded = interviewCount + offerCount;
+    const interviewRate = counts.total ? Math.round((interviewsLanded / counts.total) * 100) : 0;
+    const offerRate = counts.total ? Math.round((offerCount / counts.total) * 100) : 0;
+
+    const last7 = Array.from({ length: 7 }).map((_, idx) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - idx));
+      return d;
+    });
+
+    const last7Keys = last7.map((d) => startOfDayISO(d));
+    const activityByDay = Object.fromEntries(last7Keys.map((k) => [k, 0]));
+
+    activeApps.forEach((a) => {
+      const raw = a.createdAt || a.date;
+      if (!raw) return;
+      const key = startOfDayISO(raw);
+      if (activityByDay[key] !== undefined) activityByDay[key] += 1;
+    });
+
+    const activityValues = last7Keys.map((k) => activityByDay[k] || 0);
+
+    const upcomingFollowups = activeApps
+      .filter((a) => isValidDateStringYYYYMMDD(a.followUpDate))
+      .map((a) => ({
+        ...a,
+        followUpDateObj: new Date(`${a.followUpDate}T00:00:00`),
+      }))
+      .filter((a) => a.followUpDateObj >= new Date(startOfDayISO(now) + 'T00:00:00'))
+      .sort((a, b) => a.followUpDateObj - b.followUpDateObj)
+      .slice(0, 3);
+
+    function getResumeLabel(resumeId) {
+      if (!resumeId) return '';
+      const r = resumes.find((x) => x.id === resumeId);
+      return r ? r.label || r.fileName : 'Linked resume';
+    }
+
+    const recentApps = [...activeApps]
+      .sort((a, b) => {
+        const da = new Date(a.createdAt || a.date || 0).getTime();
+        const db = new Date(b.createdAt || b.date || 0).getTime();
+        return db - da;
+      })
+      .slice(0, 4);
+
+    const resumeStats = Object.values(
+      activeApps.reduce((acc, app) => {
+        if (!app.resumeId) return acc;
+        if (!acc[app.resumeId]) {
+          acc[app.resumeId] = {
+            resumeId: app.resumeId,
+            label: getResumeLabel(app.resumeId),
+            applications: 0,
+            applied: 0,
+            interviews: 0,
+            offers: 0,
+            rejected: 0,
+          };
+        }
+        acc[app.resumeId].applications += 1;
+        if (app.status === 'Applied') acc[app.resumeId].applied += 1;
+        if (app.status === 'Interview') acc[app.resumeId].interviews += 1;
+        if (app.status === 'Offer') acc[app.resumeId].offers += 1;
+        if (app.status === 'Rejected') acc[app.resumeId].rejected += 1;
+        return acc;
+      }, {})
     )
-    .sort((a, b) => a.followUpDateObj - b.followUpDateObj)
-    .slice(0, 3);
+      .map((r) => ({
+        ...r,
+        interviewRate: r.applications ? r.interviews / r.applications : 0,
+        offerRate: r.applications ? r.offers / r.applications : 0,
+      }))
+      .sort((a, b) => {
+        if (b.interviewRate !== a.interviewRate) return b.interviewRate - a.interviewRate;
+        return b.applications - a.applications;
+      });
+
+    const resumeFeedback = resumeStats
+      .filter((r) => r.applications >= 2)
+      .map((r) => {
+        if (r.interviewRate >= 0.35) {
+          return `${r.label} is performing strongly with ${formatPct(r.interviewRate)} interview rate.`;
+        }
+        if (r.rejected >= Math.max(2, r.interviews + r.offers)) {
+          return `${r.label} has high rejection volume. Consider revising summary, keywords, and bullets.`;
+        }
+        return `${r.label} has mixed signal. Keep testing and tailor this version to specific job posts.`;
+      })
+      .slice(0, 3);
+
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const lastWeekStart = new Date(weekStart);
+    lastWeekStart.setDate(weekStart.getDate() - 7);
+
+    const thisWeekCount = activeApps.filter(
+      (a) => new Date(a.createdAt || a.date || 0) >= weekStart
+    ).length;
+
+    const lastWeekCount = activeApps.filter((a) => {
+      const d = new Date(a.createdAt || a.date || 0);
+      return d >= lastWeekStart && d < weekStart;
+    }).length;
+
+    const velocityDelta = thisWeekCount - lastWeekCount;
+
+    const staleApps = activeApps.filter((a) => {
+      if (a.status !== 'Applied' || a.followUpDate) return false;
+      const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
+      return ageDays > 14;
+    });
+
+    const appsNeedingCoverage = activeApps.filter(
+      (a) => a.status === 'Applied' || a.status === 'Interview'
+    );
+    const followUpCoverage =
+      appsNeedingCoverage.length > 0
+        ? appsNeedingCoverage.filter((a) => a.followUpDate).length / appsNeedingCoverage.length
+        : 1;
+
+    // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
+    const healthActivity = Math.min(35, Math.round((thisWeekCount / WEEKLY_GOAL) * 35));
+    const healthConversion =
+      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 20) * 35)) : 0;
+    const healthCoverage = Math.round(followUpCoverage * 30);
+    const healthScore = healthActivity + healthConversion + healthCoverage;
+    const healthLabel =
+      healthScore >= 80 ? 'Strong' : healthScore >= 60 ? 'Active' : healthScore >= 40 ? 'Slow' : 'Stalled';
+    const healthColor =
+      healthScore >= 80 ? '#0F766E' : healthScore >= 60 ? '#2C6E91' : healthScore >= 40 ? '#D97706' : '#ef4444';
+
+    return {
+      activeApps,
+      counts,
+      appliedCount,
+      interviewCount,
+      offerCount,
+      rejectedCount,
+      interviewsLanded,
+      interviewRate,
+      offerRate,
+      last7,
+      last7Keys,
+      activityValues,
+      upcomingFollowups,
+      recentApps,
+      resumeStats,
+      resumeFeedback,
+      thisWeekCount,
+      lastWeekCount,
+      velocityDelta,
+      staleApps,
+      followUpCoverage,
+      healthScore,
+      healthLabel,
+      healthColor,
+    };
+  }, [apps, resumes]);
 
   function resumeLabelById(resumeId) {
     if (!resumeId) return '';
@@ -368,110 +520,7 @@ function Dashboard({ user, onTabChange }) {
     return r ? r.label || r.fileName : 'Linked resume';
   }
 
-  const recentApps = [...activeApps]
-    .sort((a, b) => {
-      const da = new Date(a.createdAt || a.date || 0).getTime();
-      const db = new Date(b.createdAt || b.date || 0).getTime();
-      return db - da;
-    })
-    .slice(0, 4);
-
-  const resumeStats = Object.values(
-    activeApps.reduce((acc, app) => {
-      if (!app.resumeId) return acc;
-
-      if (!acc[app.resumeId]) {
-        acc[app.resumeId] = {
-          resumeId: app.resumeId,
-          label: resumeLabelById(app.resumeId),
-          applications: 0,
-          applied: 0,
-          interviews: 0,
-          offers: 0,
-          rejected: 0,
-        };
-      }
-
-      acc[app.resumeId].applications += 1;
-      if (app.status === 'Applied') acc[app.resumeId].applied += 1;
-      if (app.status === 'Interview') acc[app.resumeId].interviews += 1;
-      if (app.status === 'Offer') acc[app.resumeId].offers += 1;
-      if (app.status === 'Rejected') acc[app.resumeId].rejected += 1;
-      return acc;
-    }, {})
-  )
-    .map((r) => ({
-      ...r,
-      interviewRate: r.applications ? r.interviews / r.applications : 0,
-      offerRate: r.applications ? r.offers / r.applications : 0,
-    }))
-    .sort((a, b) => {
-      if (b.interviewRate !== a.interviewRate) return b.interviewRate - a.interviewRate;
-      return b.applications - a.applications;
-    });
-
-  const resumeFeedback = resumeStats
-    .filter((r) => r.applications >= 2)
-    .map((r) => {
-      if (r.interviewRate >= 0.35) {
-        return `${r.label} is performing strongly with ${formatPct(r.interviewRate)} interview rate.`;
-      }
-      if (r.rejected >= Math.max(2, r.interviews + r.offers)) {
-        return `${r.label} has high rejection volume. Consider revising summary, keywords, and bullets.`;
-      }
-      return `${r.label} has mixed signal. Keep testing and tailor this version to specific job posts.`;
-    })
-    .slice(0, 3);
-
   const firstName = user?.name?.split(' ')?.[0] || 'there';
-
-  // ── Analytical computations ───────────────────────────────────────────────
-
-  const WEEKLY_GOAL = 5;
-
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  weekStart.setHours(0, 0, 0, 0);
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(weekStart.getDate() - 7);
-
-  const thisWeekCount = activeApps.filter((a) => {
-    return new Date(a.createdAt || a.date || 0) >= weekStart;
-  }).length;
-
-  const lastWeekCount = activeApps.filter((a) => {
-    const d = new Date(a.createdAt || a.date || 0);
-    return d >= lastWeekStart && d < weekStart;
-  }).length;
-
-  const velocityDelta = thisWeekCount - lastWeekCount;
-
-  const staleApps = activeApps.filter((a) => {
-    if (a.status !== 'Applied' || a.followUpDate) return false;
-    const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
-    return ageDays > 14;
-  });
-
-  const appsNeedingCoverage = activeApps.filter(
-    (a) => a.status === 'Applied' || a.status === 'Interview'
-  );
-  const followUpCoverage =
-    appsNeedingCoverage.length > 0
-      ? appsNeedingCoverage.filter((a) => a.followUpDate).length / appsNeedingCoverage.length
-      : 1;
-
-  // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
-  const healthActivity = Math.min(35, Math.round((thisWeekCount / WEEKLY_GOAL) * 35));
-  const healthConversion =
-    counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 20) * 35)) : 0;
-  const healthCoverage = Math.round(followUpCoverage * 30);
-  const healthScore = healthActivity + healthConversion + healthCoverage;
-  const healthLabel =
-    healthScore >= 80 ? 'Strong' : healthScore >= 60 ? 'Active' : healthScore >= 40 ? 'Slow' : 'Stalled';
-  const healthColor =
-    healthScore >= 80 ? '#0F766E' : healthScore >= 60 ? '#2C6E91' : healthScore >= 40 ? '#D97706' : '#ef4444';
-
-  const daysLeftInWeek = 7 - today.getDay();
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -777,7 +826,7 @@ function Dashboard({ user, onTabChange }) {
                   { id: 'Rejected', label: 'Rejected', value: rejectedCount, color: '#64748B' },
                 ]}
               />
-              {staleApps.length > 0 && !staleAlertDismissed && (
+              {staleApps.length > 0 && staleApps.some((a) => !dismissedStaleIds.includes(a.id)) && (
                 <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/25">
                   <button
                     type="button"
@@ -793,7 +842,12 @@ function Dashboard({ user, onTabChange }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStaleAlertDismissed(true)}
+                    onClick={() => {
+                      const ids = staleApps.map((a) => a.id);
+                      const next = [...new Set([...dismissedStaleIds, ...ids])];
+                      setDismissedStaleIds(next);
+                      safeWriteJSON(dismissedStaleKey, next);
+                    }}
                     className="flex-shrink-0 text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors"
                     aria-label="Dismiss"
                   >
@@ -807,7 +861,7 @@ function Dashboard({ user, onTabChange }) {
           );
         }
 
-        if (widgetId === 'applicationFunnel' && widgets.interviewsLanded) {
+        if (widgetId === 'applicationFunnel' && widgets.applicationFunnel) {
           return (
             <div key="applicationFunnel" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
               <div className="flex items-start justify-between gap-4 mb-3">
@@ -874,7 +928,7 @@ function Dashboard({ user, onTabChange }) {
           );
         }
 
-        if (widgetId === 'resumePerformance' && widgets.interviewsLanded) {
+        if (widgetId === 'resumePerformance' && widgets.applicationFunnel) {
           return (
             <div key="resumePerformance" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
               <div className="mb-3">

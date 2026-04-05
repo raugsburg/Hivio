@@ -5,6 +5,7 @@ import { COMMON_MAJORS } from '../../data/majors';
 import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS, DEFAULT_DASHBOARD_ORDER, DASHBOARD_ORDER_LABELS } from '../../data/constants';
 import { getUser, saveUser } from '../../utils/storage';
 import { getStoredTheme, storeTheme, applyThemeClass } from '../../utils/theme';
+import { EMAIL_REGEX } from '../../utils/validate';
 
 function normalizeText(s) {
   return (s || '').trim().replace(/\s+/g, ' ');
@@ -70,10 +71,14 @@ function FeedbackCard({ user }) {
                       onClick={() => setRating(star)}
                       onMouseEnter={() => setHovered(star)}
                       onMouseLeave={() => setHovered(0)}
-                      className="text-2xl transition-transform hover:scale-110"
+                      className="transition-transform hover:scale-110"
                       aria-label={`${star} star`}
                     >
-                      <span className={(hovered || rating) >= star ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700'}>★</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                        fill={(hovered || rating) >= star ? '#FBBF24' : 'none'}
+                        stroke={(hovered || rating) >= star ? '#FBBF24' : '#CBD5E1'}>
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
                     </button>
                   ))}
                   {rating > 0 && (
@@ -269,7 +274,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
 
   function validateAccount() {
     if (!normalizeText(form.email)) return 'Email is required.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    if (!EMAIL_REGEX.test(form.email.trim())) {
       return 'Enter a valid email address.';
     }
     return '';

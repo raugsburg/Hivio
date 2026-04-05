@@ -10,7 +10,7 @@ export const DEFAULT_DASHBOARD_WIDGETS = {
   weeklyGoal: true,
   statusBreakdown: true,
   weeklyActivity: true,
-  interviewsLanded: true,
+  applicationFunnel: true,
   upcomingTasks: true,
   recentApps: true,
   rejectionRate: false
@@ -32,9 +32,9 @@ export const DASHBOARD_ORDER_LABELS = {
   pipelineHealth:     { label: 'Pipeline Health',         controlledBy: 'pipelineHealth' },
   weeklyGoal:         { label: 'Weekly Goal',             controlledBy: 'weeklyGoal' },
   statusBreakdown:    { label: 'Application Status',      controlledBy: 'statusBreakdown' },
-  applicationFunnel:  { label: 'Application Funnel',      controlledBy: 'interviewsLanded' },
+  applicationFunnel:  { label: 'Application Funnel',      controlledBy: 'applicationFunnel' },
   weeklyActivity:     { label: 'Weekly Activity',         controlledBy: 'weeklyActivity' },
-  resumePerformance:  { label: 'Resume Performance',      controlledBy: 'interviewsLanded' },
+  resumePerformance:  { label: 'Resume Performance',      controlledBy: 'applicationFunnel' },
   upcomingTasks:      { label: 'Upcoming Follow-ups',     controlledBy: 'upcomingTasks' },
   recentApps:         { label: 'Recent Applications',     controlledBy: 'recentApps' },
 };
@@ -83,9 +83,9 @@ export const dashboardWidgets = [
     )
   },
   {
-    id: 'interviewsLanded',
-    label: 'Interviews Landed',
-    desc: "Highlight how many interviews you've secured so far.",
+    id: 'applicationFunnel',
+    label: 'Application Funnel & Resume',
+    desc: 'Show the conversion funnel and resume performance insights.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><polyline points="16 11 18 13 22 9" />

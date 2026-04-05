@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import bcrypt from 'bcryptjs';
 import { saveUser } from '../../utils/storage';
+import { EMAIL_REGEX } from '../../utils/validate';
 
 function Register({ onRegistrationComplete, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -24,7 +25,7 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!EMAIL_REGEX.test(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
     if (!formData.password) {

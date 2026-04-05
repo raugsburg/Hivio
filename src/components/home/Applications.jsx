@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
+import { MN_LOCATIONS } from '../../data/mn-locations';
 
 function scrollAppContainerToTop() {
   const el = document.getElementById('app-scroll-container');
@@ -67,6 +69,64 @@ const ALLOWED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
 ];
 
+const LOCATION_OPTIONS = ['Remote', ...MN_LOCATIONS];
+
+function LocationField({ value, onChange, inputClassName }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || '');
+  const containerRef = useRef(null);
+
+  useEffect(() => { setQuery(value || ''); }, [value]);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!containerRef.current?.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const suggestions = useMemo(() => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return LOCATION_OPTIONS.slice(0, 8);
+    const starts = [];
+    const contains = [];
+    for (const opt of LOCATION_OPTIONS) {
+      const t = opt.toLowerCase();
+      if (t.startsWith(q)) starts.push(opt);
+      else if (t.includes(q)) contains.push(opt);
+      if (starts.length + contains.length >= 8) break;
+    }
+    return [...starts, ...contains];
+  }, [query]);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="Remote or city..."
+        className={inputClassName}
+      />
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+          {suggestions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange(opt); setQuery(opt); setOpen(false); }}
+              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function emptyForm() {
   return {
     company: '',
@@ -78,10 +138,6 @@ function emptyForm() {
     notes: '',
     resumeId: '',
   };
-}
-
-function isValidDateStringYYYYMMDD(s) {
-  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
 function Applications({ user }) {
@@ -501,9 +557,9 @@ function Applications({ user }) {
     }
   }
 
-  const activeAppsAll = apps.filter((a) => !a.archived);
+  const activeAppsAll = useMemo(() => apps.filter((a) => !a.archived), [apps]);
 
-  const activeAppsFiltered = (() => {
+  const activeAppsFiltered = useMemo(() => {
     let list = activeAppsAll;
 
     if (activeFilter === 'followups') {
@@ -525,9 +581,9 @@ function Applications({ user }) {
     }
 
     return list;
-  })();
+  }, [activeAppsAll, activeFilter, searchQuery]);
 
-  const archivedApps = apps.filter((a) => a.archived);
+  const archivedApps = useMemo(() => apps.filter((a) => a.archived), [apps]);
 
 
   const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';
@@ -595,7 +651,7 @@ function Applications({ user }) {
           onClick={() => setShowArchived((p) => !p)}
           className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
         >
-          {showArchived ? '✓ Show Archived' : 'Show Archived'}
+          {showArchived ? 'Hide Archived' : 'Show Archived'}
           {archivedApps.length ? ` (${archivedApps.length})` : ''}
         </button>
 
@@ -621,7 +677,9 @@ function Applications({ user }) {
       {activeAppsFiltered.length === 0 ? (
         <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-center`}>
           <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
-            <span className="text-xl">📝</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 dark:text-blue-300">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
           </div>
           <p className={`text-sm font-semibold ${textMain}`}>
             {activeFilter !== 'all' ? 'No applications with this status' : 'No applications yet'}
@@ -786,7 +844,7 @@ function Applications({ user }) {
 
       {showAdd && (
         <div
-          className="absolute inset-0 z-50 bg-black/40 p-4"
+          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
           onClick={() => setShowAdd(false)}
           style={{ overscrollBehavior: 'contain' }}
         >
@@ -805,7 +863,7 @@ function Applications({ user }) {
             </div>
 
             <div
-              className="p-4 space-y-3 max-h-[82vh] overflow-y-auto"
+              className="p-4 space-y-3 pb-6"
               style={{ overscrollBehavior: 'contain' }}
             >
               {error && (
@@ -889,12 +947,10 @@ function Applications({ user }) {
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Location
                   </label>
-                  <input
-                    name="location"
+                  <LocationField
                     value={addForm.location}
-                    onChange={handleAddChange}
-                    placeholder="Remote / City"
-                    className={inputBase}
+                    onChange={(v) => setAddForm((p) => ({ ...p, location: v }))}
+                    inputClassName={inputBase}
                   />
                 </div>
               </div>
@@ -1003,7 +1059,7 @@ function Applications({ user }) {
 
       {editingApp && (
         <div
-          className="absolute inset-0 z-50 bg-black/40 p-4"
+          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
           onClick={closeEdit}
           style={{ overscrollBehavior: 'contain' }}
         >
@@ -1022,7 +1078,7 @@ function Applications({ user }) {
             </div>
 
             <div
-              className="p-4 space-y-3 max-h-[82vh] overflow-y-auto"
+              className="p-4 space-y-3 pb-6"
               style={{ overscrollBehavior: 'contain' }}
             >
               {error && (
@@ -1106,12 +1162,10 @@ function Applications({ user }) {
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                     Location
                   </label>
-                  <input
-                    name="location"
+                  <LocationField
                     value={editForm.location}
-                    onChange={handleEditChange}
-                    placeholder="Remote / City"
-                    className={inputBase}
+                    onChange={(v) => setEditForm((p) => ({ ...p, location: v }))}
+                    inputClassName={inputBase}
                   />
                 </div>
               </div>

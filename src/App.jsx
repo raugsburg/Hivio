@@ -15,6 +15,7 @@ import NotificationToast from './components/NotificationToast';
 import './App.css';
 
 import { applyThemeClass, getStoredTheme } from './utils/theme';
+import { getRemindersStorageKey } from './utils/storage';
 import {
   getDueNotifications,
   getNotificationsEnabled,
@@ -92,7 +93,7 @@ function App() {
       if (prev.some((t) => t.id === notification.id)) return prev;
       return [...prev, notification];
     });
-    markNotifShown(currentUser, notification.id);
+    if (currentUser) markNotifShown(currentUser, notification.id);
     fireNativeNotification(notification.title, notification.body);
   }
 
@@ -118,9 +119,8 @@ function App() {
     setCurrentUser(user);
     // Schedule timeouts for today's future reminders
     const today = new Date().toISOString().slice(0, 10);
-    const email = (user.email || '').toLowerCase();
     try {
-      const reminders = JSON.parse(localStorage.getItem(`hivio_reminders_${email}`) || '[]');
+      const reminders = JSON.parse(localStorage.getItem(getRemindersStorageKey(user)) || '[]');
       reminders.filter((r) => r.date === today && !r.done && r.time).forEach(scheduleReminder);
     } catch {}
 

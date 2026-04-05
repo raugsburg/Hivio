@@ -1,3 +1,5 @@
+import { getApplicationsStorageKey, getRemindersStorageKey } from './storage';
+
 export const NOTIF_ENABLED_KEY = 'hivio_notifications_enabled';
 
 // ── Enable / disable ──────────────────────────────────────────────────────────
@@ -74,12 +76,11 @@ export function getDueNotifications(user) {
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const email = (user?.email || 'anonymous').toLowerCase();
   const results = [];
 
   // Follow-up dates from applications
   try {
-    const apps = JSON.parse(localStorage.getItem(`hivio_applications_${email}`) || '[]');
+    const apps = JSON.parse(localStorage.getItem(getApplicationsStorageKey(user)) || '[]');
     apps
       .filter((a) => !a.archived && a.followUpDate === today)
       .forEach((a) => {
@@ -94,7 +95,7 @@ export function getDueNotifications(user) {
 
   // Custom reminders — only fire at or after their scheduled time
   try {
-    const reminders = JSON.parse(localStorage.getItem(`hivio_reminders_${email}`) || '[]');
+    const reminders = JSON.parse(localStorage.getItem(getRemindersStorageKey(user)) || '[]');
     reminders
       .filter((r) => {
         if (r.date !== today || r.done) return false;
