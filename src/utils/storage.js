@@ -32,6 +32,26 @@ export function getUser(email) {
   return users[email.toLowerCase()] || null;
 }
 
+export function deleteUser(email) {
+  if (!email) return;
+  const users = getAllUsers();
+  delete users[email.toLowerCase()];
+  try {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  } catch {}
+  // Remove all per-user data
+  const key = email.toLowerCase();
+  const prefixes = [
+    `hivio_applications_${key}`,
+    `hivio_applications_intent_${key}`,
+    `hivio_resumes_${key}`,
+    `hivio_reminders_${key}`,
+    `hivio_shown_notifs_${key}`,
+    `hivio_dismissed_stale_${key}`,
+  ];
+  prefixes.forEach((k) => localStorage.removeItem(k));
+}
+
 export function saveUser(userData) {
   if (!userData?.email) return;
   const users = getAllUsers();

@@ -153,8 +153,14 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       // dashboard widgets
       dashboardWidgets: user?.dashboardWidgets || { ...DEFAULT_DASHBOARD_WIDGETS },
 
-      // dashboard widget order
-      dashboardOrder: Array.isArray(user?.dashboardOrder) ? [...user.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER]
+      // dashboard widget order — merge saved order with defaults so newly-added widgets always appear
+      dashboardOrder: (() => {
+        const saved = Array.isArray(user?.dashboardOrder) ? [...user.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER];
+        for (const id of DEFAULT_DASHBOARD_ORDER) {
+          if (!saved.includes(id)) saved.push(id);
+        }
+        return saved;
+      })()
     };
   }, [user]);
 
@@ -851,6 +857,36 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       </div>
 
       <FeedbackCard user={user} />
+
+      {/* Changelog */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">What's New</p>
+          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#2C6E91]/10 text-[#2C6E91] border border-[#2C6E91]/20">
+            v0.1.1
+          </span>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Account creation showed a blank screen</p>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
+              Creating a new account would result in a blank screen instead of loading the dashboard. The onboarding flow now completes correctly.
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Pipeline Health missing from widget order</p>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
+              Pipeline Health did not appear in the dashboard widget reorder list for existing accounts. All widgets now always show.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <button
         onClick={onLogout}

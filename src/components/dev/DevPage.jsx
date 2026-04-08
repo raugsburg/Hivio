@@ -1,43 +1,20 @@
 import React, { useState } from 'react';
-import { getAllUsers, safeReadJSON } from '../../utils/storage';
+import { getAllUsers, deleteUser } from '../../utils/storage';
 import { seedUserData, clearUserData } from '../../utils/seedData';
 
 function DevPage({ onBack }) {
   const [, setRefreshKey] = useState(0);
   const [seededEmails, setSeededEmails] = useState({});
   const [confirmClear, setConfirmClear] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   function refresh() {
     setRefreshKey((k) => k + 1);
   }
 
-  // Read fresh on every refresh
   const users = getAllUsers(); // eslint-disable-line react-hooks/exhaustive-deps
   const feedbackList = (() => { try { return JSON.parse(localStorage.getItem('hivio_feedback') || '[]'); } catch { return []; } })();
   const userList = Object.values(users);
-
-  const userStats = userList.map((u) => {
-    const e = (u.email || '').toLowerCase();
-    const apps = safeReadJSON(`hivio_applications_${e}`, []);
-    const reminders = safeReadJSON(`hivio_reminders_${e}`, []);
-    const resumes = safeReadJSON(`hivio_resumes_${e}`, []);
-    const active = apps.filter((a) => !a.archived);
-    const archived = apps.filter((a) => a.archived);
-    const byStatus = active.reduce((acc, a) => {
-      acc[a.status] = (acc[a.status] || 0) + 1;
-      return acc;
-    }, {});
-    const interviewsLanded = (byStatus.Interview || 0) + (byStatus.Offer || 0);
-    const interviewRate = active.length
-      ? Math.round((interviewsLanded / active.length) * 100)
-      : 0;
-    return { user: u, apps, active, archived, reminders, resumes, byStatus, interviewRate };
-  });
-
-  const totalApps = userStats.reduce((s, x) => s + x.apps.length, 0);
-  const totalInterviews = userStats.reduce((s, x) => s + (x.byStatus.Interview || 0), 0);
-  const totalOffers = userStats.reduce((s, x) => s + (x.byStatus.Offer || 0), 0);
-  const totalRejected = userStats.reduce((s, x) => s + (x.byStatus.Rejected || 0), 0);
 
   function handleSeed(email) {
     seedUserData(email);
@@ -52,12 +29,12 @@ function DevPage({ onBack }) {
     refresh();
   }
 
-  const STATUS_COLORS = {
-    Applied: 'bg-[#2C6E91]',
-    Interview: 'bg-teal-600',
-    Offer: 'bg-amber-500',
-    Rejected: 'bg-slate-400',
-  };
+  function handleDeleteAccount(email) {
+    deleteUser(email);
+    setConfirmDelete(null);
+    setSeededEmails((prev) => ({ ...prev, [email]: false }));
+    refresh();
+  }
 
   return (
     <div className="flex flex-col px-5 pt-6 pb-6 bg-[#F7F9FC] dark:bg-slate-950">
@@ -104,35 +81,12 @@ function DevPage({ onBack }) {
       </div>
 
       {/* Aggregate stats */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        {[
-          { label: 'Registered Users', value: userList.length, color: 'text-slate-900 dark:text-slate-100' },
-          { label: 'Total Applications', value: totalApps, color: 'text-slate-900 dark:text-slate-100' },
-          { label: 'Interviews', value: totalInterviews, color: 'text-teal-700 dark:text-teal-300' },
-          { label: 'Offers', value: totalOffers, color: 'text-amber-700 dark:text-amber-300' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-300 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.08)]"
-          >
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">{s.label}</p>
-            <p className={`text-3xl font-black mt-1 ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Rejection banner if useful */}
-      {totalRejected > 0 && totalApps > 0 && (
-        <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">
-            Overall rejection rate
-          </p>
-          <p className="text-sm font-black text-slate-700 dark:text-slate-200">
-            {Math.round((totalRejected / totalApps) * 100)}%
-            <span className="text-xs font-semibold text-slate-400 ml-1">({totalRejected} of {totalApps})</span>
-          </p>
+      <div className="grid grid-cols-1 gap-2 mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-300 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">Registered Users</p>
+          <p className="text-3xl font-black mt-1 text-slate-900 dark:text-slate-100">{userList.length}</p>
         </div>
-      )}
+      </div>
 
       {/* Feedback */}
       {feedbackList.length > 0 && (
@@ -175,7 +129,7 @@ function DevPage({ onBack }) {
           </div>
         )}
 
-        {userStats.map(({ user, apps, active, archived, reminders, resumes, byStatus, interviewRate }) => {
+        {userList.map((user) => {
           const e = user.email.toLowerCase();
           const isDev = e === 'test@hivio.local';
 
@@ -185,7 +139,7 @@ function DevPage({ onBack }) {
               className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden"
             >
               {/* User header */}
-              <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 p-4">
                 <div className="w-9 h-9 rounded-full bg-[#2C6E91] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                   {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                 </div>
@@ -199,48 +153,17 @@ function DevPage({ onBack }) {
                       DEV
                     </span>
                   )}
-                  {user.profile && (
+                  {user.profile ? (
                     <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                       {user.profile.gradYear}
                     </span>
-                  )}
-                  {!user.profile && (
+                  ) : (
                     <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
                       No profile
                     </span>
                   )}
                 </div>
               </div>
-
-              {/* Stats grid */}
-              <div className="grid grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800">
-                {[
-                  { label: 'Apps', value: apps.length, sub: archived.length ? `${archived.length} archived` : `${active.length} active` },
-                  { label: 'Int. Rate', value: `${interviewRate}%`, sub: `${byStatus.Interview || 0} interviews` },
-                  { label: 'Resumes', value: resumes.length, sub: '' },
-                  { label: 'Reminders', value: reminders.length, sub: `${reminders.filter((r) => r.done).length} done` },
-                ].map((stat) => (
-                  <div key={stat.label} className="p-3 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">{stat.label}</p>
-                    <p className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5">{stat.value}</p>
-                    {stat.sub && <p className="text-[10px] text-slate-400 mt-0.5">{stat.sub}</p>}
-                  </div>
-                ))}
-              </div>
-
-              {/* Status dots */}
-              {active.length > 0 && (
-                <div className="flex items-center gap-3 px-4 py-2.5 border-t border-slate-100 dark:border-slate-800">
-                  {['Applied', 'Interview', 'Offer', 'Rejected']
-                    .filter((s) => byStatus[s])
-                    .map((s) => (
-                      <span key={s} className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLORS[s]}`} />
-                        {s} {byStatus[s]}
-                      </span>
-                    ))}
-                </div>
-              )}
 
               {/* School / program */}
               {user.profile && (
@@ -291,6 +214,37 @@ function DevPage({ onBack }) {
                     className="flex-1 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                   >
                     Clear Data
+                  </button>
+                )}
+              </div>
+
+              {/* Delete account */}
+              <div className="px-4 pb-3">
+                {confirmDelete === e ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-red-500 font-semibold flex-1">Delete account + all data?</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAccount(e)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                      Yes, Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(null)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(e)}
+                    className="w-full py-2 rounded-xl text-xs font-semibold border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                  >
+                    Delete Account
                   </button>
                 )}
               </div>
