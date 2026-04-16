@@ -23,9 +23,11 @@ function ProfileSetup({ user, onProfileComplete }) {
   });
 
   const [widgets, setWidgets] = useState({
+    pipelineHealth: true,
+    weeklyGoal: true,
     statusBreakdown: true,
+    applicationFunnel: true,
     weeklyActivity: true,
-    interviewsLanded: true,
     upcomingTasks: true,
     recentApps: true,
     rejectionRate: false,
@@ -80,25 +82,23 @@ function ProfileSetup({ user, onProfileComplete }) {
   }
 
   function handleSave() {
-    const stored = getUser(user.email);
-    if (stored) {
-      const normalizedProfile = {
-        ...profile,
-        school: normalizeText(profile.school),
-        major: normalizeText(profile.major),
-        gradYear: String(profile.gradYear),
-      };
+    const stored = getUser(user.email) || user;
+    const normalizedProfile = {
+      ...profile,
+      school: normalizeText(profile.school),
+      major: normalizeText(profile.major),
+      gradYear: String(profile.gradYear),
+    };
 
-      const updatedUser = {
-        ...stored,
-        profile: normalizedProfile,
-        avatarUrl: avatarPreview || null,
-        dashboardWidgets: widgets,
-      };
+    const updatedUser = {
+      ...stored,
+      profile: normalizedProfile,
+      avatarUrl: avatarPreview || null,
+      dashboardWidgets: widgets,
+    };
 
-      saveUser(updatedUser);
-      onProfileComplete(updatedUser);
-    }
+    saveUser(updatedUser);
+    onProfileComplete(updatedUser);
   }
 
   return (

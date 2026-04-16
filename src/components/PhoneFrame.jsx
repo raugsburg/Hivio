@@ -5,7 +5,7 @@ export default function PhoneFrame({ children }) {
   return (
     <div className="phone-frame">
       <div className="phone-notch" />
-      <div className="phone-content" id="phone-scroll-content">
+      <div className="phone-content" id="app-scroll-container">
         {children}
       </div>
     </div>

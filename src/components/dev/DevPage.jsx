@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { getAllUsers, deleteUser } from '../../utils/storage';
+import { getAllUsers } from '../../utils/storage';
 import { seedUserData, clearUserData } from '../../utils/seedData';
 
 function DevPage({ onBack }) {
   const [, setRefreshKey] = useState(0);
   const [seededEmails, setSeededEmails] = useState({});
   const [confirmClear, setConfirmClear] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
   function refresh() {
     setRefreshKey((k) => k + 1);
@@ -25,13 +24,6 @@ function DevPage({ onBack }) {
   function handleClear(email) {
     clearUserData(email);
     setConfirmClear(null);
-    setSeededEmails((prev) => ({ ...prev, [email]: false }));
-    refresh();
-  }
-
-  function handleDeleteAccount(email) {
-    deleteUser(email);
-    setConfirmDelete(null);
     setSeededEmails((prev) => ({ ...prev, [email]: false }));
     refresh();
   }
@@ -214,37 +206,6 @@ function DevPage({ onBack }) {
                     className="flex-1 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                   >
                     Clear Data
-                  </button>
-                )}
-              </div>
-
-              {/* Delete account */}
-              <div className="px-4 pb-3">
-                {confirmDelete === e ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-red-500 font-semibold flex-1">Delete account + all data?</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteAccount(e)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
-                    >
-                      Yes, Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(null)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(e)}
-                    className="w-full py-2 rounded-xl text-xs font-semibold border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                  >
-                    Delete Account
                   </button>
                 )}
               </div>

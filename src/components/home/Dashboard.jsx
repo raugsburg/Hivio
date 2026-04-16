@@ -281,12 +281,9 @@ function HealthBar({ label, score, max, color, detail }) {
 
 function Dashboard({ user, onTabChange }) {
   const widgets = user.dashboardWidgets || {
-    pipelineHealth: true,
-    weeklyGoal: true,
     statusBreakdown: true,
     weeklyActivity: true,
     applicationFunnel: true,
-    resumePerformance: true,
     upcomingTasks: true,
     recentApps: true,
     rejectionRate: false,
@@ -337,9 +334,6 @@ function Dashboard({ user, onTabChange }) {
     healthScore,
     healthLabel,
     healthColor,
-    healthActivity,
-    healthConversion,
-    healthCoverage,
   } = useMemo(() => {
     const now = new Date();
     const activeApps = apps.filter((a) => !a.archived);
@@ -517,9 +511,6 @@ function Dashboard({ user, onTabChange }) {
       healthScore,
       healthLabel,
       healthColor,
-      healthActivity,
-      healthConversion,
-      healthCoverage,
     };
   }, [apps, resumes]);
 
@@ -937,7 +928,7 @@ function Dashboard({ user, onTabChange }) {
           );
         }
 
-        if (widgetId === 'resumePerformance' && widgets.resumePerformance) {
+        if (widgetId === 'resumePerformance' && widgets.applicationFunnel) {
           return (
             <div key="resumePerformance" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
               <div className="mb-3">

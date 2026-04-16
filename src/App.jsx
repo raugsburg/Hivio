@@ -39,12 +39,6 @@ function App() {
     if (getNotificationsEnabled()) requestNotificationPermission();
   }, []);
 
-  // Reset scroll to top whenever the screen changes (e.g., ProfileSetup → app)
-  useEffect(() => {
-    const el = document.getElementById('phone-scroll-content');
-    if (el) el.scrollTop = 0;
-  }, [screen]);
-
   useEffect(() => {
     if (!notificationsEnabled || !currentUser) return;
 

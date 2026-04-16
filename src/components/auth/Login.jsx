@@ -53,19 +53,7 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
       return;
     }
 
-    if (typeof user.password !== 'string') {
-      setError('Account data is corrupted. Please re-register or contact support.');
-      return;
-    }
-
-    let isMatch = false;
-    try {
-      isMatch = await bcrypt.compare(formData.password, user.password);
-    } catch {
-      setError('Invalid email or password');
-      return;
-    }
-
+    const isMatch = await bcrypt.compare(formData.password, user.password);
     if (!isMatch) {
       setError('Invalid email or password');
       return;

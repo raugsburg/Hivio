@@ -1,0 +1,27 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hex outline -->
+  <polygon
+    points="50,12 79,28 79,60 50,76 21,60 21,28"
+    fill="none"
+    stroke="#2C6E91"
+    stroke-width="3.5"
+    stroke-linejoin="round"
+  />
+  <!-- Spokes -->
+  <line x1="50" y1="44" x2="50" y2="12"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="79" y2="28"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="79" y2="60"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="50" y2="76"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="21" y2="60"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="21" y2="28"  stroke="#2C6E91" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- Vertex nodes -->
+  <circle cx="50" cy="12" r="5.5" fill="#2C6E91"/>
+  <circle cx="79" cy="28" r="5.5" fill="#2C6E91"/>
+  <circle cx="79" cy="60" r="5.5" fill="#2C6E91"/>
+  <circle cx="50" cy="76" r="5.5" fill="#2C6E91"/>
+  <circle cx="21" cy="60" r="5.5" fill="#2C6E91"/>
+  <circle cx="21" cy="28" r="5.5" fill="#2C6E91"/>
+  <!-- Center node: white ring + teal core -->
+  <circle cx="50" cy="44" r="13" fill="white" stroke="#2C6E91" stroke-width="3"/>
+  <circle cx="50" cy="44" r="5"  fill="#2C6E91"/>
+</svg>
