@@ -151,7 +151,7 @@ function Applications({ user }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [view, setView] = useState('list'); // 'list' | 'add' | 'edit'
   const [addForm, setAddForm] = useState(emptyForm());
 
   const [editingApp, setEditingApp] = useState(null);
@@ -162,6 +162,9 @@ function Applications({ user }) {
 
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [resumeFilter, setResumeFilter] = useState(null);
+  const [showResumeMenu, setShowResumeMenu] = useState(false);
+  const resumeMenuRef = useRef(null);
 
   const [showAddResumeUpload, setShowAddResumeUpload] = useState(false);
   const [showEditResumeUpload, setShowEditResumeUpload] = useState(false);
@@ -202,16 +205,15 @@ function Applications({ user }) {
     }
   }, [intentKey]);
 
-  useEffect(() => {
-    const modalOpen = showAdd || Boolean(editingApp);
-    if (!modalOpen) return;
 
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [showAdd, editingApp]);
+  useEffect(() => {
+    if (!showResumeMenu) return;
+    function onDocClick(e) {
+      if (!resumeMenuRef.current?.contains(e.target)) setShowResumeMenu(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showResumeMenu]);
 
   function persistApps(next) {
     setApps(next);
@@ -300,18 +302,17 @@ function Applications({ user }) {
     setSuccess('');
     setError('');
     setAddForm(emptyForm());
-
     setShowAddResumeUpload(false);
     setAddResumeFile(null);
     setAddResumeLabel('');
     if (addResumeInputRef.current) addResumeInputRef.current.value = '';
-
-    setShowAdd(true);
+    setView('add');
   }
 
   function closeAdd() {
-    setShowAdd(false);
+    setView('list');
     setError('');
+    scrollAppContainerToTop();
   }
 
   function openEdit(app) {
@@ -319,7 +320,6 @@ function Applications({ user }) {
     setSuccess('');
     setError('');
     setOpenMenuId(null);
-
     setEditingApp(app);
     setEditForm({
       company: app.company || '',
@@ -331,16 +331,18 @@ function Applications({ user }) {
       notes: app.notes || '',
       resumeId: app.resumeId || '',
     });
-
     setShowEditResumeUpload(false);
     setEditResumeFile(null);
     setEditResumeLabel('');
     if (editResumeInputRef.current) editResumeInputRef.current.value = '';
+    setView('edit');
   }
 
   function closeEdit() {
+    setView('list');
     setEditingApp(null);
     setError('');
+    scrollAppContainerToTop();
   }
 
   function handleAddChange(e) {
@@ -379,7 +381,8 @@ function Applications({ user }) {
     };
 
     persistApps([newApp, ...apps]);
-    setShowAdd(false);
+    setView('list');
+    scrollAppContainerToTop();
     setSuccess('Application added.');
   }
 
@@ -413,7 +416,9 @@ function Applications({ user }) {
     );
 
     persistApps(next);
+    setView('list');
     setEditingApp(null);
+    scrollAppContainerToTop();
     setSuccess('Application updated.');
   }
 
@@ -562,6 +567,10 @@ function Applications({ user }) {
   const activeAppsFiltered = useMemo(() => {
     let list = activeAppsAll;
 
+    if (resumeFilter) {
+      list = list.filter((a) => a.resumeId === resumeFilter);
+    }
+
     if (activeFilter === 'followups') {
       list = [...list]
         .filter((a) => isValidDateStringYYYYMMDD(a.followUpDate))
@@ -581,7 +590,7 @@ function Applications({ user }) {
     }
 
     return list;
-  }, [activeAppsAll, activeFilter, searchQuery]);
+  }, [activeAppsAll, activeFilter, searchQuery, resumeFilter]);
 
   const archivedApps = useMemo(() => apps.filter((a) => a.archived), [apps]);
 
@@ -595,21 +604,195 @@ function Applications({ user }) {
   const inputBase =
     'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
 
-  return (
-    <div className={`relative flex flex-col min-h-full px-5 py-6 ${pageBg}`}>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className={`text-2xl font-bold tracking-tight ${textMain}`}>
-          Applications
-        </h1>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition-colors min-h-[40px] whitespace-nowrap"
-        >
-          + Add
-        </button>
-      </div>
+  const backBtn = 'w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0 absolute left-0';
 
+  // ─── ADD PAGE ──────────────────────────────────────────────────────────────
+  if (view === 'add') {
+    return (
+      <div className={`flex flex-col min-h-full px-5 pt-4 pb-8 ${pageBg}`}>
+        <div className="relative flex items-center justify-center h-10 mb-5">
+          <button type="button" onClick={closeAdd} className={backBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          <h1 className={`text-base font-bold ${textMain}`}>New Application</h1>
+        </div>
+
+        {error && (
+          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Company *</label>
+            <input name="company" value={addForm.company} onChange={handleAddChange} className={inputBase} />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Job Title *</label>
+            <input name="title" value={addForm.title} onChange={handleAddChange} className={inputBase} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Date *</label>
+              <input type="date" name="date" value={addForm.date} onChange={handleAddChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Status *</label>
+              <select name="status" value={addForm.status} onChange={handleAddChange} className={`${inputBase} select-field`}>
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Follow-Up</label>
+              <input type="date" name="followUpDate" value={addForm.followUpDate} onChange={handleAddChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Location</label>
+              <LocationField value={addForm.location} onChange={(v) => setAddForm((p) => ({ ...p, location: v }))} inputClassName={inputBase} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Resume Used</label>
+              <button type="button" onClick={() => setShowAddResumeUpload((p) => !p)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800">
+                {showAddResumeUpload ? 'Hide upload' : 'Upload new'}
+              </button>
+            </div>
+            <select name="resumeId" value={addForm.resumeId} onChange={handleAddChange} className={`${inputBase} select-field`}>
+              <option value="">None</option>
+              {resumes.map((r) => <option key={r.id} value={r.id}>{r.label || r.fileName}</option>)}
+            </select>
+            {showAddResumeUpload && (
+              <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
+                <button type="button" onClick={handleAddResumeFilePick} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900">
+                  Choose File
+                </button>
+                <input ref={addResumeInputRef} type="file" className="hidden" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleAddResumeFileChange} />
+                {addResumeFile && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">Selected: {addResumeFile.name}</p>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">Label</label>
+                    <input value={addResumeLabel} onChange={(e) => setAddResumeLabel(e.target.value)} className={inputBase} />
+                    <button type="button" onClick={handleAddResumeUpload} className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors">Upload & Link</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Notes</label>
+            <textarea name="notes" value={addForm.notes} onChange={handleAddChange} rows={2} className={`${inputBase} resize-none`} />
+          </div>
+          <button type="button" onClick={saveNewApp} className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1">
+            Save Application
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── EDIT PAGE ─────────────────────────────────────────────────────────────
+  if (view === 'edit') {
+    return (
+      <div className={`flex flex-col min-h-full px-5 pt-4 pb-8 ${pageBg}`}>
+        <div className="relative flex items-center justify-center h-10 mb-5">
+          <button type="button" onClick={closeEdit} className={backBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          <h1 className={`text-base font-bold ${textMain}`}>Edit Application</h1>
+        </div>
+
+        {error && (
+          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Company *</label>
+            <input name="company" value={editForm.company} onChange={handleEditChange} className={inputBase} />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Job Title *</label>
+            <input name="title" value={editForm.title} onChange={handleEditChange} className={inputBase} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Date *</label>
+              <input type="date" name="date" value={editForm.date} onChange={handleEditChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Status *</label>
+              <select name="status" value={editForm.status} onChange={handleEditChange} className={`${inputBase} select-field`}>
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Follow-Up</label>
+              <input type="date" name="followUpDate" value={editForm.followUpDate} onChange={handleEditChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Location</label>
+              <LocationField value={editForm.location} onChange={(v) => setEditForm((p) => ({ ...p, location: v }))} inputClassName={inputBase} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Resume Used</label>
+              <button type="button" onClick={() => setShowEditResumeUpload((p) => !p)} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800">
+                {showEditResumeUpload ? 'Hide upload' : 'Upload new'}
+              </button>
+            </div>
+            <select name="resumeId" value={editForm.resumeId} onChange={handleEditChange} className={`${inputBase} select-field`}>
+              <option value="">None</option>
+              {resumes.map((r) => <option key={r.id} value={r.id}>{r.label || r.fileName}</option>)}
+            </select>
+            {editForm.resumeId && (
+              <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 ml-1">Currently linked: {resumeLabelById(editForm.resumeId)}</p>
+            )}
+            {showEditResumeUpload && (
+              <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
+                <button type="button" onClick={handleEditResumeFilePick} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900">
+                  Choose File
+                </button>
+                <input ref={editResumeInputRef} type="file" className="hidden" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleEditResumeFileChange} />
+                {editResumeFile && (
+                  <div className="mt-2">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">Selected: {editResumeFile.name}</p>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">Label</label>
+                    <input value={editResumeLabel} onChange={(e) => setEditResumeLabel(e.target.value)} className={inputBase} />
+                    <button type="button" onClick={handleEditResumeUpload} className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors">Upload & Link</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Notes</label>
+            <textarea name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} className={`${inputBase} resize-none`} />
+          </div>
+          <button type="button" onClick={saveEditsAndClose} className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative flex flex-col min-h-full px-5 pt-5 pb-4 ${pageBg}`}>
+
+      {/* Search bar — top */}
       <div className="relative mb-4">
         <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -623,6 +806,7 @@ function Applications({ user }) {
         />
       </div>
 
+      {/* Status filter chips */}
       <div className="mb-4 -mx-5 px-5">
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {FILTER_CHIPS.map((chip) => {
@@ -645,15 +829,58 @@ function Applications({ user }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 mb-4">
+      {/* Toolbar: Archived | Resume filter | Export */}
+      <div className="flex items-center justify-between gap-2 mb-4">
         <button
           type="button"
-          onClick={() => setShowArchived((p) => !p)}
-          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          onClick={() => { setShowArchived((p) => !p); }}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+            showArchived
+              ? 'bg-[#2C6E91]/10 border-[#2C6E91]/40 text-[#2C6E91] dark:text-blue-300'
+              : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
         >
-          {showArchived ? 'Hide Archived' : 'Show Archived'}
-          {archivedApps.length ? ` (${archivedApps.length})` : ''}
+          {showArchived ? '← Active' : `Archived${archivedApps.length ? ` (${archivedApps.length})` : ''}`}
         </button>
+
+        {/* Resume filter dropdown */}
+        {resumes.length > 0 && (
+          <div className="relative" ref={resumeMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowResumeMenu((p) => !p)}
+              className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                resumeFilter
+                  ? 'bg-[#2C6E91]/10 border-[#2C6E91]/40 text-[#2C6E91] dark:text-blue-300'
+                  : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              {resumeFilter ? resumeLabelById(resumeFilter) : 'Resume'}
+              {resumeFilter && (
+                <span
+                  className="ml-1.5 text-[#2C6E91] dark:text-blue-300"
+                  onMouseDown={(e) => { e.stopPropagation(); setResumeFilter(null); setShowResumeMenu(false); }}
+                >×</span>
+              )}
+            </button>
+            {showResumeMenu && (
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden min-w-[160px]">
+                {resumes.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onMouseDown={() => { setResumeFilter(r.id); setShowResumeMenu(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                      resumeFilter === r.id ? 'text-[#2C6E91]' : 'text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    {r.label || r.fileName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
@@ -674,7 +901,8 @@ function Applications({ user }) {
         </div>
       )}
 
-      {activeAppsFiltered.length === 0 ? (
+      {!showArchived ? (
+        activeAppsFiltered.length === 0 ? (
         <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-center`}>
           <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 dark:text-blue-300">
@@ -682,10 +910,10 @@ function Applications({ user }) {
               </svg>
           </div>
           <p className={`text-sm font-semibold ${textMain}`}>
-            {activeFilter !== 'all' ? 'No applications with this status' : 'No applications yet'}
+            {activeFilter !== 'all' || resumeFilter ? 'No applications match this filter' : 'No applications yet'}
           </p>
           <p className={`text-xs ${textSub} font-medium mt-1`}>
-            {activeFilter !== 'all' ? 'Try changing the filter or add a new application.' : 'Click "+ Add" above to start tracking your job applications.'}
+            {activeFilter !== 'all' || resumeFilter ? 'Try changing the filter or add a new application.' : 'Tap the + button to start tracking your job applications.'}
           </p>
         </div>
       ) : (
@@ -797,486 +1025,61 @@ function Applications({ user }) {
             );
           })}
         </div>
-      )}
-
-      {showArchived && archivedApps.length > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className={`text-sm font-bold ${textMain}`}>
-                Archived
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{archivedApps.length} archived application{archivedApps.length !== 1 ? 's' : ''}</p>
-            </div>
+      )
+      ) : (
+        /* Archived view */
+        archivedApps.length === 0 ? (
+          <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-center`}>
+            <p className={`text-sm font-semibold ${textMain}`}>No archived applications</p>
+            <p className={`text-xs ${textSub} font-medium mt-1`}>Archived apps will appear here.</p>
           </div>
-          <div className="space-y-3">
-            {archivedApps.map((a) => (
-              <div
-                key={a.id}
-                className={`${cardBg} ${border} rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12)]`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${textMain} truncate`}>
-                      {a.title}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
-                      {a.company}
-                    </p>
-                    <p className="text-xs text-slate-400 font-medium mt-1">
-                      Applied on {a.date}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleUnarchive(a.id)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    Unarchive
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showAdd && (
-        <div
-          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
-          onClick={() => setShowAdd(false)}
-          style={{ overscrollBehavior: 'contain' }}
-        >
-          <div
-            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={closeAdd}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-
-            <div
-              className="p-4 space-y-3 pb-6"
-              style={{ overscrollBehavior: 'contain' }}
-            >
-              {error && (
-                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Company *
-                </label>
-                <input
-                  name="company"
-                  value={addForm.company}
-                  onChange={handleAddChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Job Title *
-                </label>
-                <input
-                  name="title"
-                  value={addForm.title}
-                  onChange={handleAddChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    value={addForm.date}
-                    onChange={handleAddChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Status *
-                  </label>
-                  <select
-                    name="status"
-                    value={addForm.status}
-                    onChange={handleAddChange}
-                    className={`${inputBase} select-field`}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Follow-Up
-                  </label>
-                  <input
-                    type="date"
-                    name="followUpDate"
-                    value={addForm.followUpDate}
-                    onChange={handleAddChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Location
-                  </label>
-                  <LocationField
-                    value={addForm.location}
-                    onChange={(v) => setAddForm((p) => ({ ...p, location: v }))}
-                    inputClassName={inputBase}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Resume Used
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowAddResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    {showAddResumeUpload ? 'Hide upload' : 'Upload new'}
-                  </button>
-                </div>
-
-                <select
-                  name="resumeId"
-                  value={addForm.resumeId}
-                  onChange={handleAddChange}
-                  className={`${inputBase} select-field`}
+        ) : (
+          <div>
+            <p className="text-xs font-semibold text-slate-400 mb-3">{archivedApps.length} archived application{archivedApps.length !== 1 ? 's' : ''}</p>
+            <div className="space-y-3">
+              {archivedApps.map((a) => (
+                <div
+                  key={a.id}
+                  className={`${cardBg} ${border} rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12)]`}
                 >
-                  <option value="">None</option>
-                  {resumes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label || r.fileName}
-                    </option>
-                  ))}
-                </select>
-
-                {showAddResumeUpload && (
-                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAddResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
-                      >
-                        Choose File
-                      </button>
-
-                      <input
-                        ref={addResumeInputRef}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleAddResumeFileChange}
-                      />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold ${textMain} truncate`}>{a.title}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">{a.company}</p>
+                      <p className="text-xs text-slate-400 font-medium mt-1">Applied on {a.date}</p>
                     </div>
-
-                    {addResumeFile && (
-                      <div className="mt-2">
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                          Selected: {addResumeFile.name}
-                        </p>
-
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
-                          Label
-                        </label>
-                        <input
-                          value={addResumeLabel}
-                          onChange={(e) => setAddResumeLabel(e.target.value)}
-                          className={inputBase}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={handleAddResumeUpload}
-                          className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors"
-                        >
-                          Upload & Link
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleUnarchive(a.id)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 flex-shrink-0"
+                    >
+                      Unarchive
+                    </button>
                   </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  value={addForm.notes}
-                  onChange={handleAddChange}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveNewApp}
-                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1"
-              >
-                Save Application
-              </button>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )
       )}
 
-      {editingApp && (
-        <div
-          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
-          onClick={closeEdit}
-          style={{ overscrollBehavior: 'contain' }}
-        >
-          <div
-            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+      {/* Sticky FAB — stays visible at the bottom of the phone scroll area */}
+      {!showArchived && (
+        <div className="sticky bottom-4 flex justify-end pointer-events-none mt-4">
+          <button
+            type="button"
+            onClick={openAdd}
+            className="pointer-events-auto w-14 h-14 bg-[#2C6E91] hover:bg-[#1a4a66] text-white rounded-full shadow-[0_4px_20px_rgba(44,110,145,0.45)] flex items-center justify-center transition-all active:scale-95"
+            aria-label="Add application"
           >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-
-            <div
-              className="p-4 space-y-3 pb-6"
-              style={{ overscrollBehavior: 'contain' }}
-            >
-              {error && (
-                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Company *
-                </label>
-                <input
-                  name="company"
-                  value={editForm.company}
-                  onChange={handleEditChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Job Title *
-                </label>
-                <input
-                  name="title"
-                  value={editForm.title}
-                  onChange={handleEditChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    value={editForm.date}
-                    onChange={handleEditChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Status *
-                  </label>
-                  <select
-                    name="status"
-                    value={editForm.status}
-                    onChange={handleEditChange}
-                    className={`${inputBase} select-field`}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Follow-Up
-                  </label>
-                  <input
-                    type="date"
-                    name="followUpDate"
-                    value={editForm.followUpDate}
-                    onChange={handleEditChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Location
-                  </label>
-                  <LocationField
-                    value={editForm.location}
-                    onChange={(v) => setEditForm((p) => ({ ...p, location: v }))}
-                    inputClassName={inputBase}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Resume Used
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowEditResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    {showEditResumeUpload ? 'Hide upload' : 'Upload new'}
-                  </button>
-                </div>
-
-                <select
-                  name="resumeId"
-                  value={editForm.resumeId}
-                  onChange={handleEditChange}
-                  className={`${inputBase} select-field`}
-                >
-                  <option value="">None</option>
-                  {resumes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label || r.fileName}
-                    </option>
-                  ))}
-                </select>
-
-                {editForm.resumeId ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 ml-1">
-                    Currently linked: {resumeLabelById(editForm.resumeId)}
-                  </p>
-                ) : null}
-
-                {showEditResumeUpload && (
-                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleEditResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
-                      >
-                        Choose File
-                      </button>
-
-                      <input
-                        ref={editResumeInputRef}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleEditResumeFileChange}
-                      />
-                    </div>
-
-                    {editResumeFile && (
-                      <div className="mt-2">
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                          Selected: {editResumeFile.name}
-                        </p>
-
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
-                          Label
-                        </label>
-                        <input
-                          value={editResumeLabel}
-                          onChange={(e) => setEditResumeLabel(e.target.value)}
-                          className={inputBase}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={handleEditResumeUpload}
-                          className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors"
-                        >
-                          Upload & Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  value={editForm.notes}
-                  onChange={handleEditChange}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveEditsAndClose}
-                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
         </div>
       )}
+
+
     </div>
   );
 }

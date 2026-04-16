@@ -53,7 +53,19 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
       return;
     }
 
-    const isMatch = await bcrypt.compare(formData.password, user.password);
+    if (typeof user.password !== 'string') {
+      setError('Account data is corrupted. Please re-register or contact support.');
+      return;
+    }
+
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(formData.password, user.password);
+    } catch {
+      setError('Invalid email or password');
+      return;
+    }
+
     if (!isMatch) {
       setError('Invalid email or password');
       return;
@@ -62,75 +74,195 @@ function Login({ onLogin, onSwitchToRegister, onSwitchToForgotPassword }) {
     onLogin(user);
   }
 
-  const inputBase =
-    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+  const inputStyle = {
+    width: '100%',
+    background: 'var(--bg-card)',
+    border: '1.5px solid var(--border)',
+    color: 'var(--text-1)',
+    borderRadius: 14,
+    padding: '13px 16px',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    fontFamily: "'DM Sans', sans-serif",
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: 11,
+    fontWeight: 700,
+    fontFamily: "'Syne', sans-serif",
+    color: 'var(--text-2)',
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  };
+
+  function focusInput(e) {
+    e.target.style.borderColor = 'var(--brand)';
+    e.target.style.boxShadow = '0 0 0 3px var(--brand-glow)';
+  }
+  function blurInput(e) {
+    e.target.style.borderColor = 'var(--border)';
+    e.target.style.boxShadow = 'none';
+  }
 
   return (
-    <div className="flex flex-col min-h-screen px-8 pt-16 pb-8 justify-start bg-[#F7F9FC] dark:bg-slate-950">
-      {/* Logo + branding */}
-      <div className="flex flex-col items-center mb-8">
-        <img src="/hivio-logo.svg" alt="Hivio" className="w-28 h-28 mb-3" />
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100%',
+      background: 'var(--bg-app)',
+      padding: '0 24px',
+    }}>
 
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-1">Hivio</h1>
-        <p className="text-slate-500 dark:text-slate-300 text-center font-medium text-sm">
+      {/* Logo + brand */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingTop: 80,
+        paddingBottom: 52,
+      }}>
+        <img
+          src="/hivio-logo.svg"
+          alt="Hivio"
+          style={{ width: 96, height: 96, marginBottom: 20 }}
+        />
+        <h1 style={{
+          fontFamily: "'Syne', sans-serif",
+          fontSize: 36,
+          fontWeight: 700,
+          color: 'var(--text-1)',
+          letterSpacing: '0.14em',
+          lineHeight: 1.1,
+          margin: '0 0 8px',
+        }}>
+          HIVIO
+        </h1>
+        <p style={{
+          color: 'var(--text-3)',
+          fontSize: 13,
+          fontFamily: "'DM Sans', sans-serif",
+          letterSpacing: '0.01em',
+          margin: 0,
+        }}>
           Turning applications into interviews
         </p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Email</label>
+          <label style={labelStyle}>Email</label>
           <input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             placeholder="student@university.edu"
-            className={inputBase}
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
+
         <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Password</label>
+          <label style={labelStyle}>Password</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             placeholder="••••••••"
-            className={inputBase}
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
-        <div className="text-left">
+
+        <div style={{ textAlign: 'right', marginTop: -4 }}>
           <button
             type="button"
             onClick={onSwitchToForgotPassword}
-            className="text-[#2C6E91] font-semibold hover:underline text-sm"
+            style={{
+              color: 'var(--brand)',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif",
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
           >
-            Forgot Password?
+            Forgot password?
           </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+          <div style={{
+            background: 'rgba(220,38,38,0.08)',
+            border: '1px solid rgba(220,38,38,0.2)',
+            color: '#DC2626',
+            fontSize: 13,
+            fontWeight: 500,
+            padding: '11px 14px',
+            borderRadius: 12,
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
             {error}
           </div>
         )}
 
         <button
           type="submit"
-          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-2"
+          style={{
+            width: '100%',
+            background: 'var(--brand)',
+            color: '#FFFFFF',
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 700,
+            fontSize: 15,
+            letterSpacing: '0.05em',
+            padding: '14px',
+            borderRadius: 14,
+            border: 'none',
+            cursor: 'pointer',
+            marginTop: 4,
+            boxShadow: 'var(--shadow-btn)',
+            transition: 'transform 0.1s',
+          }}
+          onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+          onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
         >
           Sign In
         </button>
       </form>
 
-      <p className="text-center text-slate-500 dark:text-slate-300 text-sm mt-6 font-medium">
+      <p style={{
+        textAlign: 'center',
+        color: 'var(--text-2)',
+        fontSize: 13,
+        marginTop: 28,
+        fontFamily: "'DM Sans', sans-serif",
+      }}>
         New to Hivio?{' '}
         <button
           type="button"
           onClick={onSwitchToRegister}
-          className="text-[#2C6E91] font-semibold hover:underline"
+          style={{
+            color: 'var(--brand)',
+            fontWeight: 700,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 13,
+          }}
         >
           Create an account
         </button>

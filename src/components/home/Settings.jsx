@@ -150,16 +150,20 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       gradYear: user?.profile?.gradYear || '',
       interests: Array.isArray(user?.profile?.interests) ? user.profile.interests : [],
 
+      // weekly application goal
+      weeklyGoalTarget: user?.weeklyGoalTarget || 5,
+
       // dashboard widgets
       dashboardWidgets: user?.dashboardWidgets || { ...DEFAULT_DASHBOARD_WIDGETS },
 
       // dashboard widget order — merge saved order with defaults so newly-added widgets always appear
       dashboardOrder: (() => {
+        const REMOVED = ['weeklyGoal', 'statusBreakdown'];
         const saved = Array.isArray(user?.dashboardOrder) ? [...user.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER];
         for (const id of DEFAULT_DASHBOARD_ORDER) {
           if (!saved.includes(id)) saved.push(id);
         }
-        return saved;
+        return saved.filter((id) => !REMOVED.includes(id));
       })()
     };
   }, [user]);
@@ -342,6 +346,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
 
     const updatedUser = {
       ...storedUser,
+      weeklyGoalTarget: Math.max(1, Math.min(50, Number(form.weeklyGoalTarget) || 5)),
       dashboardWidgets: {
         ...(storedUser.dashboardWidgets || {}),
         ...(form.dashboardWidgets || {})
@@ -600,6 +605,24 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         )}
 
         <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Weekly Application Goal</p>
+          <p className="text-xs text-slate-400 mb-3">
+            Used to score your activity in Pipeline Health.
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={form.weeklyGoalTarget}
+              onChange={(e) => setForm((prev) => ({ ...prev, weeklyGoalTarget: e.target.value }))}
+              className="w-20 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91]"
+            />
+            <span className="text-xs text-slate-400 font-medium">apps per week</span>
+          </div>
+        </div>
+
+        <div className={`${card} mb-4 p-4`}>
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Dashboard Widgets</p>
           <p className="text-xs text-slate-400 mb-3">
             Toggle what shows on your home screen.
@@ -732,9 +755,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   // =========================
   return (
     <div className={pageWrap}>
-      <h1 className={`text-2xl font-bold tracking-tight ${title} mb-6`}>
-        Settings
-      </h1>
+
 
       <div className={`${card} flex items-center gap-4 mb-6 p-4`}>
         {user.avatarUrl ? (

@@ -162,20 +162,29 @@ function StatusDistribution({ total, items, onSelect }) {
   );
 }
 
-function ApplicationFunnel({ applied, interview, offer, onSelect }) {
+function ApplicationFunnel({ applied, interview, offer, rejected, onSelect }) {
   const rows = [
     { id: 'Applied', label: 'Applied', value: applied, color: '#2C6E91' },
     { id: 'Interview', label: 'Interview', value: interview, color: '#0F766E' },
     { id: 'Offer', label: 'Offer', value: offer, color: '#D97706' },
+    { id: 'Rejected', label: 'Rejected', value: rejected, color: '#ef4444' },
   ];
-  const max = Math.max(1, applied, interview, offer);
+  // Always scale relative to applied so bars represent true funnel proportions
+  const max = Math.max(1, applied);
 
   return (
     <div>
       {rows.map((r, i) => {
         const pct = Math.round((r.value / max) * 100);
         const prev = rows[i - 1];
-        const convRate = prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null;
+        // For Rejected, show % of applied that were rejected instead of "moved forward"
+        const isRejected = r.id === 'Rejected';
+        const convRate = prev && prev.value > 0
+          ? Math.round((r.value / (isRejected ? applied : prev.value)) * 100)
+          : null;
+        const connectorLabel = isRejected
+          ? `${convRate}% of applied rejected`
+          : `${convRate}% moved forward`;
 
         return (
           <div key={r.id}>
@@ -184,7 +193,7 @@ function ApplicationFunnel({ applied, interview, offer, onSelect }) {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600 flex-shrink-0">
                   <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
                 </svg>
-                <span className="text-[10px] font-semibold text-slate-400">{convRate}% moved forward</span>
+                <span className="text-[10px] font-semibold text-slate-400">{connectorLabel}</span>
               </div>
             )}
             <button
@@ -280,16 +289,24 @@ function HealthBar({ label, score, max, color, detail }) {
 }
 
 function Dashboard({ user, onTabChange }) {
-  const widgets = user.dashboardWidgets || {
-    statusBreakdown: true,
+  const widgets = {
+    pipelineHealth: true,
     weeklyActivity: true,
     applicationFunnel: true,
+    resumePerformance: true,
     upcomingTasks: true,
     recentApps: true,
     rejectionRate: false,
+    ...(user.dashboardWidgets || {}),
+    // These widgets have been removed — always off regardless of saved prefs
+    weeklyGoal: false,
+    statusBreakdown: false,
   };
 
-  const dashboardOrder = user.dashboardOrder || DEFAULT_DASHBOARD_ORDER;
+  const REMOVED_WIDGETS = ['weeklyGoal', 'statusBreakdown'];
+  const dashboardOrder = (user.dashboardOrder || DEFAULT_DASHBOARD_ORDER).filter(
+    (id) => !REMOVED_WIDGETS.includes(id)
+  );
 
   const appsKey = useMemo(() => getApplicationsStorageKey(user), [user]);
   const resumesKey = useMemo(() => getResumesStorageKey(user), [user]);
@@ -334,6 +351,10 @@ function Dashboard({ user, onTabChange }) {
     healthScore,
     healthLabel,
     healthColor,
+    healthActivity,
+    healthConversion,
+    healthCoverage,
+    rollingWeeklyAvg,
   } = useMemo(() => {
     const now = new Date();
     const activeApps = apps.filter((a) => !a.archived);
@@ -461,6 +482,14 @@ function Dashboard({ user, onTabChange }) {
 
     const velocityDelta = thisWeekCount - lastWeekCount;
 
+    // 4-week rolling average for activity score
+    const fourWeeksAgo = new Date(weekStart);
+    fourWeeksAgo.setDate(weekStart.getDate() - 28);
+    const rollingCount = activeApps.filter(
+      (a) => new Date(a.createdAt || a.date || 0) >= fourWeeksAgo
+    ).length;
+    const rollingWeeklyAvg = rollingCount / 4;
+
     const staleApps = activeApps.filter((a) => {
       if (a.status !== 'Applied' || a.followUpDate) return false;
       const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
@@ -476,9 +505,12 @@ function Dashboard({ user, onTabChange }) {
         : 1;
 
     // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
-    const healthActivity = Math.min(35, Math.round((thisWeekCount / WEEKLY_GOAL) * 35));
+    // Activity: based on 4-week rolling average vs user's weekly goal
+    const weeklyGoalTarget = user?.weeklyGoalTarget || WEEKLY_GOAL;
+    const healthActivity = Math.min(35, Math.round((rollingWeeklyAvg / weeklyGoalTarget) * 35));
+    // Conversion: 10% interview rate = full score (realistic industry benchmark)
     const healthConversion =
-      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 20) * 35)) : 0;
+      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 10) * 35)) : 0;
     const healthCoverage = Math.round(followUpCoverage * 30);
     const healthScore = healthActivity + healthConversion + healthCoverage;
     const healthLabel =
@@ -511,6 +543,10 @@ function Dashboard({ user, onTabChange }) {
       healthScore,
       healthLabel,
       healthColor,
+      healthActivity,
+      healthConversion,
+      healthCoverage,
+      rollingWeeklyAvg,
     };
   }, [apps, resumes]);
 
@@ -882,6 +918,7 @@ function Dashboard({ user, onTabChange }) {
                 applied={Math.max(1, appliedCount)}
                 interview={interviewCount}
                 offer={offerCount}
+                rejected={rejectedCount}
                 onSelect={navigateToApplicationsWithStatus}
               />
               {counts.total >= 5 && (
@@ -928,7 +965,7 @@ function Dashboard({ user, onTabChange }) {
           );
         }
 
-        if (widgetId === 'resumePerformance' && widgets.applicationFunnel) {
+        if (widgetId === 'resumePerformance' && widgets.resumePerformance) {
           return (
             <div key="resumePerformance" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
               <div className="mb-3">

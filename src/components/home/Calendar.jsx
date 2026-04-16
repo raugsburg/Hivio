@@ -232,15 +232,6 @@ function Calendar({ user, onNotify, onSchedule }) {
 
   return (
     <div className={`flex flex-col px-5 pt-6 pb-6 ${pageBg}`}>
-      <div className="mb-5">
-        <h1 className={`text-2xl font-bold tracking-tight ${title} mb-1`}>
-          Calendar + Reminders
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">
-          Your schedule combines follow-ups from applications and custom reminders.
-        </p>
-      </div>
-
       <div className={`${cardBg} rounded-2xl p-4 ${border} shadow-[0_2px_12px_rgba(0,0,0,0.15)] mb-4`}>
         <div className="flex items-center justify-between mb-3">
           <button

@@ -1,70 +1,67 @@
 .phone-frame {
   width: 390px;
   height: 844px;
-  /* IMPORTANT: frame background should be "hardware", not the app screen */
-  background-color: #ffffff;
-  border-radius: 40px;
-  border: 8px solid #333333;
+  /* Background matches app content — island floats on app color, no hardware bar */
+  background-color: var(--bg-app);
+  border-radius: 46px;
+  border: 6px solid #C8CDD8;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.7) inset,
+    0 28px 72px rgba(0, 0, 0, 0.22),
+    0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
+/* Dynamic island pill — dark hardware element */
 .phone-notch {
-  width: 150px;
-  height: 28px;
-  background-color: #333333;
-  border-radius: 0 0 18px 18px;
+  width: 126px;
+  height: 32px;
+  background-color: #080B11;
+  border-radius: 0 0 22px 22px;
   margin: 0 auto;
   position: relative;
   z-index: 10;
+  border-left: 1.5px solid #1E2535;
+  border-right: 1.5px solid #1E2535;
+  border-bottom: 1.5px solid #1E2535;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-/* The APP screen background should live here */
 .phone-content {
-  height: calc(100% - 28px);
+  height: calc(100% - 30px);
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   -webkit-overflow-scrolling: touch;
-
-  background-color: #f7f9fc; /* <- light app background */
+  /* Contain overscroll — prevents white flash at top/bottom on bounce */
+  overscroll-behavior: contain;
+  background-color: var(--bg-app);
 }
 
-/* Thin scrollbar that doesn't eat space */
-.phone-content::-webkit-scrollbar {
-  width: 3px;
-}
+/* No scrollbar */
+.phone-content::-webkit-scrollbar { display: none; }
+.phone-content { -ms-overflow-style: none; scrollbar-width: none; }
 
-.phone-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.phone-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 10px;
-}
-
-/* ===== Dark mode overrides (NO layout changes) ===== */
-
-/* frame stays as "hardware" surround */
+/* ===== Dark mode ===== */
 html.dark .phone-frame {
-  background-color: #020617;
-  border-color: #0f172a;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  background-color: var(--bg-app);
+  border-color: #1A2030;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 28px 72px rgba(0, 0, 0, 0.7),
+    0 0 50px rgba(27, 108, 168, 0.1);
 }
 
-/* keep notch consistent with hardware */
 html.dark .phone-notch {
-  background-color: #0f172a;
+  background-color: #050710;
+  border-color: #161C2A;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
-/* app screen background in dark mode — must match dark:bg-slate-950 (#020617) */
 html.dark .phone-content {
-  background-color: #020617;
+  background-color: var(--bg-app);
 }
 
-html.dark .phone-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-}
+

@@ -2,59 +2,214 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* ================================================================
+   DESIGN TOKENS
+   ================================================================ */
+:root {
+  --brand:         #1B6CA8;
+  --brand-deep:    #134F7D;
+  --brand-hover:   #156096;
+  --brand-light:   #E8F3FB;
+  --brand-glow:    rgba(27, 108, 168, 0.22);
+
+  --bg-app:        #EEF3F9;
+  --bg-card:       #FFFFFF;
+  --bg-input:      #F4F7FA;
+  --bg-hover:      #F0F5FA;
+  --border:        #DDE4EE;
+  --border-strong: #C8D2E0;
+
+  --text-1:        #0B1623;
+  --text-2:        #4E6278;
+  --text-3:        #8FA4B5;
+
+  --status-applied:   #1B6CA8;
+  --status-interview: #6D28D9;
+  --status-offer:     #047857;
+  --status-rejected:  #64748B;
+
+  --shadow-card:  0 1px 4px rgba(11,22,35,0.06), 0 4px 16px rgba(11,22,35,0.07);
+  --shadow-nav:   0 -1px 0 rgba(11,22,35,0.07), 0 -6px 20px rgba(11,22,35,0.05);
+  --shadow-input: 0 1px 3px rgba(11,22,35,0.06);
+  --shadow-btn:   0 4px 14px rgba(27,108,168,0.28);
+}
+
+html.dark {
+  --bg-app:        #080E18;
+  --bg-card:       #0D1626;
+  --bg-input:      #0A1220;
+  --bg-hover:      #0F1C30;
+  --border:        rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.11);
+
+  --text-1:        #EDF2F7;
+  --text-2:        #7A96AB;
+  --text-3:        #3D5568;
+
+  --brand-light:   rgba(27, 108, 168, 0.15);
+  --brand-glow:    rgba(27, 108, 168, 0.3);
+
+  --shadow-card:  0 1px 4px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.28);
+  --shadow-nav:   0 -1px 0 rgba(255,255,255,0.05), 0 -6px 20px rgba(0,0,0,0.3);
+  --shadow-input: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-btn:   0 4px 14px rgba(27,108,168,0.35);
+}
+
+/* ================================================================
+   BASE
+   ================================================================ */
 body {
   margin: 0;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: 'DM Mono', source-code-pro, Menlo, Monaco, Consolas, monospace;
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-/* --- Dark mode autofill fix (Chrome/Safari) --- */
-html.dark input:-webkit-autofill,
-html.dark textarea:-webkit-autofill,
-html.dark select:-webkit-autofill {
-  -webkit-text-fill-color: #e2e8f0; /* slate-200 */
-  caret-color: #e2e8f0;
-  -webkit-box-shadow: 0 0 0px 1000px #020617 inset; /* slate-950 */
-  box-shadow: 0 0 0px 1000px #020617 inset;
+/* ================================================================
+   SCROLLBAR
+   ================================================================ */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ================================================================
+   AUTOFILL — uses CSS variables so light & dark are handled
+   automatically without separate overrides.
+   ================================================================ */
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--text-1) !important;
+  caret-color: var(--text-1);
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-card) inset !important;
+  box-shadow:         0 0 0px 1000px var(--bg-card) inset !important;
   transition: background-color 9999s ease-in-out 0s;
 }
-
-/* Optional: keep borders consistent if your inputs look odd */
-html.dark input:-webkit-autofill:focus,
-html.dark textarea:-webkit-autofill:focus,
-html.dark select:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px #020617 inset, 0 0 0 2px rgba(44, 110, 145, 0.3);
-  box-shadow: 0 0 0px 1000px #020617 inset, 0 0 0 2px rgba(44, 110, 145, 0.3);
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-card) inset, 0 0 0 3px var(--brand-glow) !important;
+  box-shadow:         0 0 0px 1000px var(--bg-card) inset, 0 0 0 3px var(--brand-glow) !important;
 }
 
-/* Keep select arrows consistent in dark mode on iOS/WebKit */
+/* ================================================================
+   SELECT FIELD — custom arrow
+   ================================================================ */
 .select-field {
   -webkit-appearance: none;
   appearance: none;
   padding-right: 2.75rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%2364748B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%234E6278' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.9rem center;
   background-size: 1rem 1rem;
 }
+.select-field::-ms-expand { display: none; }
+html.dark .select-field {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%237A96AB' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
 
-.select-field::-ms-expand {
+/* ================================================================
+   OVERSCROLL — prevent white flash on bounce/momentum scroll
+   ================================================================ */
+#app-scroll-container {
+  overscroll-behavior: contain;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+#app-scroll-container::-webkit-scrollbar {
   display: none;
 }
 
-html.dark .select-field {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%23CBD5E1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+/* ================================================================
+   GLOBAL APP BACKGROUND SYNC
+   All page-level containers in the scrollable app area should use
+   the CSS variable so they stay in sync with the design tokens.
+   ================================================================ */
+#app-scroll-container > div {
+  background-color: var(--bg-app) !important;
+}
+
+/* ================================================================
+   CARD BACKGROUNDS — sync Tailwind bg-white / dark:bg-slate-900
+   ================================================================ */
+.phone-content .bg-white {
+  background-color: var(--bg-card) !important;
+}
+.dark .phone-content .dark\:bg-slate-900 {
+  background-color: var(--bg-card) !important;
+}
+/* Deeper dark bg used in some places */
+.dark .phone-content .dark\:bg-slate-950 {
+  background-color: var(--bg-app) !important;
+}
+
+/* ================================================================
+   BORDER SYNC
+   ================================================================ */
+.dark .phone-content .dark\:border-slate-800 {
+  border-color: var(--border) !important;
+}
+.dark .phone-content .dark\:border-slate-700 {
+  border-color: var(--border) !important;
+}
+
+/* ================================================================
+   INPUT BACKGROUNDS SYNC
+   ================================================================ */
+.phone-content .bg-slate-50,
+.phone-content .bg-\[#F7F9FC\] {
+  background-color: var(--bg-input) !important;
+}
+.dark .phone-content .dark\:bg-slate-950 {
+  background-color: var(--bg-input) !important;
+}
+
+/* ================================================================
+   BRAND BUTTON SYNC — bg-[#2C6E91] → var(--brand)
+   ================================================================ */
+.phone-content .bg-\[\#2C6E91\] {
+  background-color: var(--brand) !important;
+}
+.phone-content .hover\:bg-\[\#1a4a66\]:hover {
+  background-color: var(--brand-deep) !important;
+}
+
+/* ================================================================
+   FOCUS RING SYNC — focus:ring-[#2C6E91]/30 → brand glow
+   ================================================================ */
+.phone-content .focus\:border-\[\#2C6E91\]:focus {
+  border-color: var(--brand) !important;
+}
+.phone-content .focus\:ring-\[\#2C6E91\]\/30:focus {
+  --tw-ring-color: var(--brand-glow) !important;
+}
+
+/* ================================================================
+   TYPOGRAPHY REFINEMENT
+   Only apply Syne where explicitly needed; do NOT blanket h1/h2
+   as it breaks descender clipping in components with tight layout.
+   Syne is applied via inline style on auth/onboarding headers only.
+   ================================================================ */
+
+/* ================================================================
+   CARD SHADOW REFINEMENT
+   Apply consistent shadow to all cards in the app
+   ================================================================ */
+.phone-content .rounded-2xl.border,
+.phone-content .rounded-xl.border {
+  box-shadow: var(--shadow-card);
+}
+
+/* ================================================================
+   NOTIFICATION TOAST — refined
+   ================================================================ */
+.phone-content .sticky.top-0 {
+  /* Ensure toast area backdrop is transparent so it blends */
+  backdrop-filter: none;
 }

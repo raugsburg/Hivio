@@ -67,15 +67,15 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
     'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
 
   return (
-    <div className="flex flex-col min-h-screen px-8 py-10 bg-[#F7F9FC] dark:bg-slate-950 relative">
-      <div className="flex flex-col items-center text-center mb-10 mt-16">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">Create Account</h1>
-        <p className="text-slate-500 dark:text-slate-300 font-medium leading-relaxed">
-          Join Hivio and get your job search organized today.
+    <div className="h-full flex flex-col px-6 pt-8 pb-8 bg-[#F7F9FC] dark:bg-slate-950 relative">
+      <div className="flex flex-col items-center text-center mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-1">Create Account</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">
+          Join Hivio and get your job search organized.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Full Name</label>
           <input
@@ -130,18 +130,18 @@ function Register({ onRegistrationComplete, onSwitchToLogin }) {
 
         <button
           type="submit"
-          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-6"
+          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-4"
         >
           Create Account
         </button>
-      </form>
 
-      <p className="text-center text-slate-500 dark:text-slate-300 text-sm mt-10 font-medium">
-        Already have an account?{' '}
-        <button type="button" onClick={onSwitchToLogin} className="text-[#2C6E91] font-semibold hover:underline">
-          Sign in
-        </button>
-      </p>
+        <p className="text-center text-slate-500 dark:text-slate-300 text-sm pt-1 font-medium">
+          Already have an account?{' '}
+          <button type="button" onClick={onSwitchToLogin} className="text-[#2C6E91] font-semibold hover:underline">
+            Sign in
+          </button>
+        </p>
+      </form>
     </div>
   );
 }
