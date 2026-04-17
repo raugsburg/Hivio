@@ -3,9 +3,10 @@ import AutocompleteInput from '../common/Autocompleteinput';
 import { MN_SCHOOLS } from '../../data/schools-mn';
 import { COMMON_MAJORS } from '../../data/majors';
 import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS, DEFAULT_DASHBOARD_ORDER, DASHBOARD_ORDER_LABELS } from '../../data/constants';
-import { getUser, saveUser } from '../../utils/storage';
+import { submitFeedback } from '../../utils/db';
+import { saveUserProfile } from '../../utils/db';
 import { getStoredTheme, storeTheme, applyThemeClass } from '../../utils/theme';
-import { EMAIL_REGEX } from '../../utils/validate';
+
 
 function normalizeText(s) {
   return (s || '').trim().replace(/\s+/g, ' ');
@@ -27,11 +28,7 @@ function FeedbackCard({ user }) {
       comment: comment.trim(),
       submittedAt: new Date().toISOString(),
     };
-    try {
-      const key = 'hivio_feedback';
-      const prev = JSON.parse(localStorage.getItem(key) || '[]');
-      localStorage.setItem(key, JSON.stringify([entry, ...prev]));
-    } catch {}
+    submitFeedback(entry).catch(() => {});
     setSubmitted(true);
     setTimeout(() => { setOpen(false); setSubmitted(false); setRating(0); setComment(''); }, 2000);
   }
@@ -283,50 +280,36 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   }
 
   function validateAccount() {
-    if (!normalizeText(form.email)) return 'Email is required.';
-    if (!EMAIL_REGEX.test(form.email.trim())) {
-      return 'Enter a valid email address.';
-    }
+    if (!normalizeText(form.name)) return 'Name is required.';
     return '';
   }
 
-  function persistUserAndUpdateState(updatedUser) {
-    saveUser(updatedUser);
-    if (typeof onUpdateUser === 'function') onUpdateUser(updatedUser);
+  async function persistUserAndUpdateState(updates) {
+    await saveUserProfile(user.uid, updates);
+    if (typeof onUpdateUser === 'function') onUpdateUser({ ...user, ...updates });
   }
 
-  function saveAccountDetails() {
+  async function saveAccountDetails() {
     setError('');
     setSuccess('');
 
     const v = validateAccount();
-    if (v) {
-      setError(v);
-      return;
-    }
+    if (v) { setError(v); return; }
 
-    const storedUser = getUser(user.email);
-    if (!storedUser) {
-      setError('No stored user found. Please log out and log back in.');
-      return;
-    }
-
-    const updatedUser = {
-      ...storedUser,
+    const updates = {
       name: normalizeText(form.name),
-      email: form.email.trim().toLowerCase(),
       avatarUrl: form.avatarUrl || null,
       profile: {
-        ...(storedUser.profile || {}),
+        ...(user.profile || {}),
         school: normalizeText(form.school),
         major: normalizeText(form.major),
         gradYear: String(form.gradYear),
-        interests: form.interests || []
-      }
+        interests: form.interests || [],
+      },
     };
 
     try {
-      persistUserAndUpdateState(updatedUser);
+      await persistUserAndUpdateState(updates);
       setSuccess('Account details updated.');
       setView('main');
     } catch {
@@ -334,28 +317,21 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
     }
   }
 
-  function saveDashboardPersonalization() {
+  async function saveDashboardPersonalization() {
     setError('');
     setSuccess('');
 
-    const storedUser = getUser(user.email);
-    if (!storedUser) {
-      setError('No stored user found. Please log out and log back in.');
-      return;
-    }
-
-    const updatedUser = {
-      ...storedUser,
+    const updates = {
       weeklyGoalTarget: Math.max(1, Math.min(50, Number(form.weeklyGoalTarget) || 5)),
       dashboardWidgets: {
-        ...(storedUser.dashboardWidgets || {}),
-        ...(form.dashboardWidgets || {})
+        ...(user.dashboardWidgets || {}),
+        ...(form.dashboardWidgets || {}),
       },
       dashboardOrder: Array.isArray(form.dashboardOrder) ? [...form.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER],
     };
 
     try {
-      persistUserAndUpdateState(updatedUser);
+      await persistUserAndUpdateState(updates);
       setSuccess('Dashboard preferences saved.');
       setView('main');
     } catch {
@@ -465,14 +441,11 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
                 Email
               </label>
-              <input
-                name="email"
-                value={form.email}
-                onChange={handleBasicChange}
-                className={inputBase}
-              />
+              <div className={`${inputBase} opacity-60 cursor-not-allowed`}>
+                {form.email}
+              </div>
               <p className={`text-[11px] font-medium mt-1 ml-1 ${faintText}`}>
-                This is used for login in your local MVP.
+                Email is managed through your account and cannot be changed here.
               </p>
             </div>
           </div>
@@ -884,26 +857,53 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100">What's New</p>
           <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#2C6E91]/10 text-[#2C6E91] border border-[#2C6E91]/20">
-            v0.1.1
+            v0.7
           </span>
         </div>
         <div className="space-y-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Account creation showed a blank screen</p>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20">New</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Firebase backend</p>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
-              Creating a new account would result in a blank screen instead of loading the dashboard. The onboarding flow now completes correctly.
+              All data now syncs to the cloud. Applications, resumes, reminders, and your profile are stored in Firestore — accessible from any device.
             </p>
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Pipeline Health missing from widget order</p>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20">New</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Real authentication</p>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
-              Pipeline Health did not appear in the dashboard widget reorder list for existing accounts. All widgets now always show.
+              Sign in and registration now use Firebase Auth. Forgot password sends a real reset email to your inbox.
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-500/20">Improved</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Applications as full pages</p>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
+              Adding and editing applications now opens a dedicated page with a back button — no more popup overlays.
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-500/20">Improved</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Dashboard widgets reduced to 6</p>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
+              Streamlined to Pipeline Health, Weekly Activity, Application Funnel, Resume Performance, Upcoming Follow-ups, and Recent Applications.
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-500/20">Improved</span>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">UI &amp; typography overhaul</p>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
+              New design token system, DM Sans throughout, consistent font sizing, cleaner onboarding flow, and removed redundant page titles.
             </p>
           </div>
         </div>

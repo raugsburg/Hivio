@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import bcrypt from 'bcryptjs';
-import { getUser, saveUser } from '../../utils/storage';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../firebase';
 
 function ForgotPassword({ onSwitchToLogin }) {
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleReset(e) {
     e.preventDefault();
@@ -15,33 +14,28 @@ function ForgotPassword({ onSwitchToLogin }) {
     setSuccess('');
 
     if (!email.trim()) {
-      setError('Please enter your email');
-      return;
-    }
-    if (!newPassword || !confirmNewPassword) {
-      setError('Please enter and confirm your new password');
-      return;
-    }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      setError('Passwords do not match');
+      setError('Please enter your email address.');
       return;
     }
 
-    const user = getUser(email.trim());
-    if (!user) {
-      setError('No account found. Please register first.');
-      return;
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccess('Password reset email sent. Check your inbox.');
+    } catch (err) {
+      switch (err.code) {
+        case 'auth/user-not-found':
+          setError('No account found with that email.');
+          break;
+        case 'auth/invalid-email':
+          setError('Enter a valid email address.');
+          break;
+        default:
+          setError('Failed to send reset email. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-
-    const hashed = await bcrypt.hash(newPassword, 10);
-    saveUser({ ...user, password: hashed });
-    setSuccess('Password reset successfully. You can now sign in.');
-    setNewPassword('');
-    setConfirmNewPassword('');
   }
 
   const inputStyle = {
@@ -58,236 +52,102 @@ function ForgotPassword({ onSwitchToLogin }) {
     boxSizing: 'border-box',
   };
 
-  const labelStyle = {
-    display: 'block',
-    fontSize: 11,
-    fontWeight: 700,
-    fontFamily: "'Syne', sans-serif",
-    color: 'var(--text-2)',
-    letterSpacing: '0.07em',
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  };
-
-  function focusInput(e) {
-    e.target.style.borderColor = 'var(--brand)';
-    e.target.style.boxShadow = '0 0 0 3px var(--brand-glow)';
-  }
-  function blurInput(e) {
-    e.target.style.borderColor = 'var(--border)';
-    e.target.style.boxShadow = 'none';
-  }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--bg-app)', padding: '0 24px' }}>
-
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: '100%',
+      background: 'var(--bg-app)', padding: '0 24px',
+    }}>
       {/* Header */}
-      <div style={{ paddingTop: 44, paddingBottom: 28 }}>
-        {/* Back button */}
-        <button
-          type="button"
-          onClick={onSwitchToLogin}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            color: 'var(--text-3)', background: 'none', border: 'none',
-            cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-            fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 24,
-            transition: 'color 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--brand)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          Back to Sign In
-        </button>
-
-        {/* Lock icon */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 72, paddingBottom: 40 }}>
         <div style={{
-          width: 48, height: 48, borderRadius: 14,
-          background: 'var(--brand-light)', border: '1.5px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: 16,
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'var(--brand-light)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', marginBottom: 20,
         }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
         <h1 style={{
-          fontFamily: "'Syne', sans-serif",
-          fontSize: 24, fontWeight: 700,
-          color: 'var(--text-1)',
-          letterSpacing: '0.06em', lineHeight: 1.2,
-          margin: '0 0 6px',
+          fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700,
+          color: 'var(--text-1)', margin: '0 0 8px', textAlign: 'center',
         }}>
           Reset Password
         </h1>
-        <p style={{ color: 'var(--text-3)', fontSize: 13, fontFamily: "'DM Sans', sans-serif", margin: 0 }}>
-          Enter your email and choose a new password.
+        <p style={{
+          color: 'var(--text-3)', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+          textAlign: 'center', margin: 0, lineHeight: 1.5,
+        }}>
+          Enter your email and we'll send you a reset link.
         </p>
       </div>
 
-      {/* Form */}
-      <div style={{ flex: 1, paddingBottom: 24 }}>
-        <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label style={{
+            display: 'block', fontSize: 11, fontWeight: 700,
+            fontFamily: "'Syne', sans-serif", color: 'var(--text-2)',
+            letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6,
+          }}>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(''); setSuccess(''); }}
+            placeholder="student@university.edu"
+            style={inputStyle}
+            onFocus={e => { e.target.style.borderColor = 'var(--brand)'; e.target.style.boxShadow = '0 0 0 3px var(--brand-glow)'; }}
+            onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+          />
+        </div>
 
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); if (error) setError(''); if (success) setSuccess(''); }}
-              placeholder="student@university.edu"
-              style={inputStyle}
-              onFocus={focusInput}
-              onBlur={blurInput}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => { setNewPassword(e.target.value); if (error) setError(''); if (success) setSuccess(''); }}
-              placeholder="At least 8 characters"
-              style={inputStyle}
-              onFocus={focusInput}
-              onBlur={blurInput}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmNewPassword}
-              onChange={(e) => { setConfirmNewPassword(e.target.value); if (error) setError(''); if (success) setSuccess(''); }}
-              placeholder="••••••••"
-              style={inputStyle}
-              onFocus={focusInput}
-              onBlur={blurInput}
-            />
-          </div>
-
-          {error && (
-            <div style={{
-              background: 'rgba(220,38,38,0.08)',
-              border: '1px solid rgba(220,38,38,0.2)',
-              color: '#DC2626',
-              fontSize: 13,
-              fontWeight: 500,
-              padding: '11px 14px',
-              borderRadius: 12,
-              fontFamily: "'DM Sans', sans-serif",
-            }}>
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div style={{
-              background: 'rgba(4,120,87,0.08)',
-              border: '1px solid rgba(4,120,87,0.2)',
-              color: '#047857',
-              fontSize: 13,
-              fontWeight: 600,
-              padding: '11px 14px',
-              borderRadius: 12,
-              fontFamily: "'DM Sans', sans-serif",
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              {success}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            style={{
-              width: '100%',
-              background: 'var(--brand)',
-              color: '#FFFFFF',
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 700,
-              fontSize: 15,
-              letterSpacing: '0.02em',
-              padding: '14px',
-              borderRadius: 14,
-              border: 'none',
-              cursor: 'pointer',
-              marginTop: 4,
-              boxShadow: 'var(--shadow-btn)',
-              transition: 'opacity 0.15s, transform 0.1s',
-            }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            Reset Password
-          </button>
-        </form>
-
-        {success && (
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            style={{
-              display: 'block',
-              width: '100%',
-              marginTop: 12,
-              padding: '13px',
-              borderRadius: 14,
-              border: '1.5px solid var(--border)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-1)',
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: 'pointer',
-              letterSpacing: '0.02em',
-              transition: 'border-color 0.15s',
-              textAlign: 'center',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-          >
-            Sign In Now
-          </button>
+        {error && (
+          <div style={{
+            background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)',
+            color: '#DC2626', fontSize: 13, fontWeight: 500,
+            padding: '11px 14px', borderRadius: 12, fontFamily: "'DM Sans', sans-serif",
+          }}>{error}</div>
         )}
 
-        <p style={{
-          textAlign: 'center',
-          color: 'var(--text-2)',
-          fontSize: 13,
-          marginTop: 28,
-          fontFamily: "'DM Sans', sans-serif",
-        }}>
-          Remembered it?{' '}
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            style={{
-              color: 'var(--brand)',
-              fontWeight: 700,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 13,
-            }}
-          >
-            Back to Sign In
-          </button>
-        </p>
-      </div>
+        {success && (
+          <div style={{
+            background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)',
+            color: '#059669', fontSize: 13, fontWeight: 500,
+            padding: '11px 14px', borderRadius: 12, fontFamily: "'DM Sans', sans-serif",
+          }}>{success}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || !!success}
+          style={{
+            width: '100%', background: 'var(--brand)', color: '#FFFFFF',
+            fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15,
+            letterSpacing: '0.05em', padding: '14px', borderRadius: 14,
+            border: 'none', cursor: (loading || success) ? 'not-allowed' : 'pointer',
+            marginTop: 4, boxShadow: 'var(--shadow-btn)', opacity: (loading || success) ? 0.7 : 1,
+          }}
+        >
+          {loading ? 'Sending…' : 'Send Reset Email'}
+        </button>
+      </form>
+
+      <p style={{
+        textAlign: 'center', color: 'var(--text-2)',
+        fontSize: 13, marginTop: 28, fontFamily: "'DM Sans', sans-serif",
+      }}>
+        <button
+          type="button"
+          onClick={onSwitchToLogin}
+          style={{
+            color: 'var(--brand)', fontWeight: 700, background: 'none',
+            border: 'none', cursor: 'pointer', padding: 0,
+            fontFamily: "'DM Sans', sans-serif", fontSize: 13,
+          }}
+        >
+          ← Back to Sign In
+        </button>
+      </p>
     </div>
   );
 }

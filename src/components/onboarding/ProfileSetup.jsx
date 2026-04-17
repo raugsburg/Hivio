@@ -3,7 +3,7 @@ import AutocompleteInput from '../common/Autocompleteinput';
 import { MN_SCHOOLS } from '../../data/schools-mn';
 import { COMMON_MAJORS } from '../../data/majors';
 import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS } from '../../data/constants';
-import { getUser, saveUser } from '../../utils/storage';
+import { saveUserProfile } from '../../utils/db';
 import { getStoredTheme, applyThemeClass } from '../../utils/theme';
 
 function normalizeText(s) {
@@ -77,10 +77,8 @@ function ProfileSetup({ user, onProfileComplete }) {
     setWidgets(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function handleSave() {
-    const stored = getUser(user.email) || user;
-    const updatedUser = {
-      ...stored,
+  async function handleSave() {
+    const updatedProfile = {
       profile: {
         ...profile,
         school: normalizeText(profile.school),
@@ -90,8 +88,8 @@ function ProfileSetup({ user, onProfileComplete }) {
       avatarUrl: avatarPreview || null,
       dashboardWidgets: widgets,
     };
-    saveUser(updatedUser);
-    onProfileComplete(updatedUser);
+    await saveUserProfile(user.uid, updatedProfile);
+    onProfileComplete({ ...user, ...updatedProfile });
   }
 
   // ─── STEP 1: Academic info + career interests, no scroll ────────────────────
@@ -258,6 +256,7 @@ function ProfileSetup({ user, onProfileComplete }) {
         <button
           onClick={handleSave}
           className="flex-1 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors"
+          type="button"
         >
           Save & Continue
         </button>

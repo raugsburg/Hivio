@@ -1,26 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getResumesStorageKey } from '../../utils/storage';
+import React, { useEffect, useRef, useState } from 'react';
+import { subscribeResumes, saveResume, updateResumeLabel, deleteResume } from '../../utils/db';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
 ];
-
-function readResumesFromStorage(storageKey) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function writeResumesToStorage(storageKey, resumes) {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(resumes));
-  } catch {}
-}
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -31,7 +16,6 @@ function formatBytes(bytes) {
 }
 
 function Resumes({ user }) {
-  const storageKey = useMemo(() => getResumesStorageKey(user), [user]);
   const fileInputRef = useRef(null);
 
   const [resumes, setResumes] = useState([]);
@@ -41,21 +25,18 @@ function Resumes({ user }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // modal + menu state
+  const [dataUrlCache, setDataUrlCache] = useState({});
+
   const [viewingResume, setViewingResume] = useState(null);
   const [viewLabel, setViewLabel] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Load resumes on first render (and when user changes)
   useEffect(() => {
-    setResumes(readResumesFromStorage(storageKey));
-  }, [storageKey]);
-
-  function persist(next) {
-    setResumes(next);
-    writeResumesToStorage(storageKey, next);
-  }
+    if (!user?.uid) return;
+    const unsub = subscribeResumes(user.uid, setResumes);
+    return () => unsub();
+  }, [user?.uid]);
 
   function openFilePicker() {
     setError('');
@@ -116,7 +97,6 @@ function Resumes({ user }) {
 
     try {
       const dataUrl = await fileToDataUrl(selectedFile);
-
       const newResume = {
         id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
         fileName: selectedFile.name,
@@ -124,25 +104,26 @@ function Resumes({ user }) {
         fileSize: selectedFile.size,
         label: label.trim(),
         uploadedAt: new Date().toISOString(),
-        dataUrl,
       };
 
-      const next = [newResume, ...resumes];
-      persist(next);
+      await saveResume(user.uid, newResume);
+      setDataUrlCache((prev) => ({ ...prev, [newResume.id]: dataUrl }));
 
       setSelectedFile(null);
       setLabel('');
-      setSuccess('Resume uploaded successfully.');
+      setSuccess('Resume saved successfully.');
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (e) {
-      setError('Upload failed. Please try again.');
+      setError('Save failed. Please try again.');
     }
   }
 
-  function handleDelete(resumeId) {
-    const updated = resumes.filter((r) => r.id !== resumeId);
-    persist(updated);
-
+  async function handleDelete(resumeId) {
+    try {
+      await deleteResume(user.uid, resumeId);
+    } catch {
+      setError('Delete failed. Please try again.');
+    }
     if (viewingResume?.id === resumeId) {
       setViewingResume(null);
       setViewLabel('');
@@ -151,12 +132,11 @@ function Resumes({ user }) {
 
   function openViewer(resume) {
     setOpenMenuId(null);
-    setViewingResume(resume);
+    setViewingResume({ ...resume, dataUrl: dataUrlCache[resume.id] });
     setViewLabel(resume.label || '');
   }
 
-  // return true/false so the Save button can close only on success
-  function saveViewerLabel() {
+  async function saveViewerLabel() {
     if (!viewingResume) return false;
 
     const nextLabel = viewLabel.trim();
@@ -165,18 +145,15 @@ function Resumes({ user }) {
       return false;
     }
 
-    const updated = resumes.map((r) =>
-      r.id === viewingResume.id ? { ...r, label: nextLabel } : r
-    );
-
-    persist(updated);
-
-    // keep modal in sync
-    const updatedResume = updated.find((r) => r.id === viewingResume.id);
-    setViewingResume(updatedResume || viewingResume);
-
-    setSuccess('Label updated.');
-    return true;
+    try {
+      await updateResumeLabel(user.uid, viewingResume.id, nextLabel);
+      setViewingResume((prev) => prev ? { ...prev, label: nextLabel } : prev);
+      setSuccess('Label updated.');
+      return true;
+    } catch {
+      setError('Failed to update label.');
+      return false;
+    }
   }
 
   const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';
@@ -413,9 +390,9 @@ function Resumes({ user }) {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      const ok = saveViewerLabel();
-                      if (ok) setViewingResume(null); // close instantly only if save succeeds
+                    onClick={async () => {
+                      const ok = await saveViewerLabel();
+                      if (ok) setViewingResume(null);
                     }}
                     className="px-4 py-3 rounded-xl bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold transition-colors"
                   >
@@ -424,7 +401,14 @@ function Resumes({ user }) {
                 </div>
               </div>
 
-              {viewingResume.fileType === 'application/pdf' ? (
+              {!viewingResume.dataUrl ? (
+                <div className="text-sm text-slate-700 dark:text-slate-200 text-center py-6">
+                  <p className="font-semibold mb-2">Preview not available</p>
+                  <p className="text-slate-500 dark:text-slate-300 text-sm">
+                    File previews are only available in the session the file was uploaded. Delete this entry and re-upload to enable preview.
+                  </p>
+                </div>
+              ) : viewingResume.fileType === 'application/pdf' ? (
                 <iframe
                   title="Resume preview"
                   src={viewingResume.dataUrl}
@@ -438,7 +422,6 @@ function Resumes({ user }) {
                   <p className="text-slate-500 dark:text-slate-300 text-sm mb-3">
                     You can download/open the file instead.
                   </p>
-
                   <a
                     href={viewingResume.dataUrl}
                     download={viewingResume.fileName}

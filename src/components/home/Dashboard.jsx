@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { getApplicationsIntentKey, getDismissedStaleKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { subscribeApplications, subscribeResumes } from '../../utils/db';
 import { DEFAULT_DASHBOARD_ORDER } from '../../data/constants';
 import { startOfDayISO, isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 
@@ -308,20 +309,19 @@ function Dashboard({ user, onTabChange }) {
     (id) => !REMOVED_WIDGETS.includes(id)
   );
 
-  const appsKey = useMemo(() => getApplicationsStorageKey(user), [user]);
-  const resumesKey = useMemo(() => getResumesStorageKey(user), [user]);
-  const intentKey = useMemo(() => getApplicationsIntentKey(user), [user]);
+  const intentKey = useMemo(() => getApplicationsIntentKey(user?.uid), [user]);
+  const dismissedStaleKey = useMemo(() => getDismissedStaleKey(user?.uid), [user]);
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
-
-  const dismissedStaleKey = `hivio_dismissed_stale_${user?.email?.toLowerCase() || 'anon'}`;
   const [dismissedStaleIds, setDismissedStaleIds] = useState(() => safeReadJSON(dismissedStaleKey, []));
 
   useEffect(() => {
-    setApps(safeReadJSON(appsKey, []));
-    setResumes(safeReadJSON(resumesKey, []));
-  }, [appsKey, resumesKey]);
+    if (!user?.uid) return;
+    const unsubApps = subscribeApplications(user.uid, setApps);
+    const unsubResumes = subscribeResumes(user.uid, setResumes);
+    return () => { unsubApps(); unsubResumes(); };
+  }, [user?.uid]);
 
   const today = new Date();
   const daysLeftInWeek = 7 - today.getDay();

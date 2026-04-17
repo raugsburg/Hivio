@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getApplicationsStorageKey, getRemindersStorageKey, safeReadJSON } from '../../utils/storage';
+import {
+  subscribeApplications, subscribeReminders, subscribeResumes,
+  saveReminder as dbSaveReminder, updateReminder as dbUpdateReminder, deleteReminder as dbDeleteReminder,
+} from '../../utils/db';
 import { startOfDayISO, isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 
 function monthLabel(d) {
@@ -59,12 +62,9 @@ function nextHourTime() {
 }
 
 function Calendar({ user, onNotify, onSchedule }) {
-  const appsKey = useMemo(() => getApplicationsStorageKey(user), [user]);
-  const remindersKey = useMemo(() => getRemindersStorageKey(user), [user]);
-
   const [apps, setApps] = useState([]);
   const [reminders, setReminders] = useState([]);
-  const remindersLoaded = useRef(false);
+  const [resumes, setResumes] = useState([]);
 
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -84,20 +84,12 @@ function Calendar({ user, onNotify, onSchedule }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setApps(safeReadJSON(appsKey, []));
-    remindersLoaded.current = false;
-    setReminders(safeReadJSON(remindersKey, []));
-  }, [appsKey, remindersKey]);
-
-  useEffect(() => {
-    if (!remindersLoaded.current) {
-      remindersLoaded.current = true;
-      return;
-    }
-    try {
-      localStorage.setItem(remindersKey, JSON.stringify(reminders));
-    } catch {}
-  }, [reminders, remindersKey]);
+    if (!user?.uid) return;
+    const unsubApps = subscribeApplications(user.uid, setApps);
+    const unsubRem = subscribeReminders(user.uid, setReminders);
+    const unsubResumes = subscribeResumes(user.uid, setResumes);
+    return () => { unsubApps(); unsubRem(); unsubResumes(); };
+  }, [user?.uid]);
 
   const activeApps = apps.filter((a) => !a.archived);
 
@@ -111,7 +103,7 @@ function Calendar({ user, onNotify, onSchedule }) {
       company: a.company || '',
       status: a.status || 'Applied',
       location: a.location || '',
-      resumeLabel: a.resumeId ? 'Resume linked' : '',
+      resumeLabel: a.resumeId ? (resumes.find((r) => r.id === a.resumeId)?.label || 'Resume linked') : '',
       appId: a.id,
       time: '',
       done: false,
@@ -178,10 +170,11 @@ function Calendar({ user, onNotify, onSchedule }) {
     const today = startOfDayISO(new Date());
 
     if (editingId) {
-      const updated = { title: form.title.trim(), date: form.date, time: form.time || '', notes: form.notes.trim() };
-      setReminders((prev) =>
-        prev.map((r) => r.id === editingId ? { ...r, ...updated } : r)
-      );
+      const existing = reminders.find((r) => r.id === editingId);
+      if (existing) {
+        const updated = { ...existing, title: form.title.trim(), date: form.date, time: form.time || '', notes: form.notes.trim() };
+        dbSaveReminder(user.uid, updated).catch(() => {});
+      }
       setEditingId(null);
       setSelectedDate(form.date);
     } else {
@@ -194,10 +187,9 @@ function Calendar({ user, onNotify, onSchedule }) {
         done: false,
         createdAt: new Date().toISOString(),
       };
-      setReminders((prev) => [next, ...prev]);
+      dbSaveReminder(user.uid, next).catch(() => {});
       setSelectedDate(form.date);
 
-      // Immediately notify if reminder is for today
       if (form.date === today && typeof onNotify === 'function') {
         onNotify({
           id: `reminder_created_${next.id}_${today}`,
@@ -206,7 +198,6 @@ function Calendar({ user, onNotify, onSchedule }) {
           body: next.title,
         });
       }
-      // Schedule a timed popup if it has a future time
       if (typeof onSchedule === 'function') onSchedule(next);
     }
 
@@ -215,14 +206,15 @@ function Calendar({ user, onNotify, onSchedule }) {
   }
 
   function toggleReminderDone(reminderId) {
-    setReminders((prev) =>
-      prev.map((r) => (r.id === reminderId ? { ...r, done: !r.done } : r))
-    );
+    const reminder = reminders.find((r) => r.id === reminderId);
+    if (reminder) {
+      dbUpdateReminder(user.uid, reminderId, { done: !reminder.done }).catch(() => {});
+    }
   }
 
   function deleteReminder(reminderId) {
     if (editingId === reminderId) cancelEdit();
-    setReminders((prev) => prev.filter((r) => r.id !== reminderId));
+    dbDeleteReminder(user.uid, reminderId).catch(() => {});
   }
 
   const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';

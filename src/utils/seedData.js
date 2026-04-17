@@ -1,3 +1,6 @@
+import { db } from '../firebase';
+import { writeBatch, doc, collection, deleteDoc, getDocs } from 'firebase/firestore';
+
 function daysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -26,8 +29,6 @@ function shuffle(arr) {
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-// ─── Company pool ────────────────────────────────────────────────────────────
 
 const COMPANY_POOL = [
   { company: 'Google', title: 'Software Engineer Intern', location: 'Mountain View, CA' },
@@ -62,47 +63,28 @@ const COMPANY_POOL = [
   { company: 'TD Bank', title: 'Software Developer Co-op', location: 'Toronto, ON' },
 ];
 
-// ─── Notes pool by status ─────────────────────────────────────────────────────
-
 const NOTES_BY_STATUS = {
   Applied: [
-    'Applied through careers page.',
-    'Referral from a friend on the team.',
-    'Found via Levels.fyi job board.',
-    'Reached out to a recruiter on LinkedIn first.',
-    'Campus recruiting event referral.',
-    'Applied through LinkedIn Easy Apply.',
-    '',
-    '',
-    '',
+    'Applied through careers page.', 'Referral from a friend on the team.',
+    'Found via Levels.fyi job board.', 'Reached out to a recruiter on LinkedIn first.',
+    'Campus recruiting event referral.', 'Applied through LinkedIn Easy Apply.', '', '', '',
   ],
   Interview: [
-    'Phone screen scheduled for next week.',
-    'Technical screen went well. Waiting on next steps.',
-    'Completed take-home project. Felt confident.',
-    'Two rounds of technical interviews done.',
-    'HireVue assessment completed.',
-    'Recruiter said timeline is 2–3 weeks.',
+    'Phone screen scheduled for next week.', 'Technical screen went well. Waiting on next steps.',
+    'Completed take-home project. Felt confident.', 'Two rounds of technical interviews done.',
+    'HireVue assessment completed.', 'Recruiter said timeline is 2–3 weeks.',
     'First round was behavioural. Second round is technical.',
   ],
   Offer: [
-    'Offer received! Need to review and respond.',
-    'Verbal offer extended — written offer incoming.',
-    'Offer deadline in 2 weeks. Comparing with other options.',
-    'Strong offer. Negotiating start date.',
+    'Offer received! Need to review and respond.', 'Verbal offer extended — written offer incoming.',
+    'Offer deadline in 2 weeks. Comparing with other options.', 'Strong offer. Negotiating start date.',
   ],
   Rejected: [
-    'Got a form rejection email.',
-    'No feedback provided.',
-    'OA was tough. Did not advance.',
-    'Technical screen did not go well.',
-    'Position was filled internally.',
-    '',
-    '',
+    'Got a form rejection email.', 'No feedback provided.',
+    'OA was tough. Did not advance.', 'Technical screen did not go well.',
+    'Position was filled internally.', '', '',
   ],
 };
-
-// ─── Reminder pool ────────────────────────────────────────────────────────────
 
 const REMINDER_POOL = [
   { title: 'Follow up with recruiter', time: '10:00', notes: 'Check on interview timeline' },
@@ -125,11 +107,9 @@ const SEED_RESUMES = [
   { label: 'Data & Analytics Resume', fileName: 'Data_Analytics_Resume.pdf' },
 ];
 
-// ─── Weighted status picker ───────────────────────────────────────────────────
-// Applied ~40%, Rejected ~28%, Interview ~22%, Offer ~10%
-
-function pickStatus(weights = [40, 28, 22, 10]) {
+function pickStatus() {
   const statuses = ['Applied', 'Rejected', 'Interview', 'Offer'];
+  const weights = [40, 28, 22, 10];
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < statuses.length; i++) {
@@ -139,47 +119,38 @@ function pickStatus(weights = [40, 28, 22, 10]) {
   return 'Applied';
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ─── Seed — writes to Firestore via batch ─────────────────────────────────────
 
-export function seedUserData(email) {
-  const e = email.toLowerCase();
+export async function seedUserData(uid) {
+  const ts = Date.now();
 
   const resumes = SEED_RESUMES.map((r, i) => ({
-    id: `seed_resume_${i}_${e}`,
+    id: `seed_resume_${i}_${ts}`,
     label: r.label,
     fileName: r.fileName,
-    fileData: null,
+    fileType: 'application/pdf',
+    fileSize: 0,
     uploadedAt: new Date(Date.now() - (60 - i * 10) * 86400000).toISOString(),
   }));
 
-  // Pick 20–24 random companies from the pool
   const count = randInt(20, 24);
   const companies = shuffle(COMPANY_POOL).slice(0, count);
 
-  // Spread dates across last 55 days, with more recent apps clustered in the last 14
-  const recentDays = companies.slice(0, Math.ceil(count * 0.4)).map((_, i) => randInt(0, 13));
-  const olderDays = companies.slice(Math.ceil(count * 0.4)).map((_, i) => randInt(14, 55));
+  const recentDays = companies.slice(0, Math.ceil(count * 0.4)).map(() => randInt(0, 13));
+  const olderDays = companies.slice(Math.ceil(count * 0.4)).map(() => randInt(14, 55));
   const dayOffsets = shuffle([...recentDays, ...olderDays]);
 
-  // Ensure at least 1 offer and 2 interviews in the mix
   const statuses = companies.map(() => pickStatus());
   if (!statuses.includes('Offer')) {
-    // Find a non-Interview slot to avoid clobbering interviews
-    const nonInterviewIdxs = statuses.map((s, i) => s !== 'Interview' ? i : -1).filter(i => i >= 0);
-    const targetIdx = nonInterviewIdxs.length > 0
-      ? nonInterviewIdxs[randInt(0, nonInterviewIdxs.length - 1)]
-      : randInt(0, count - 1);
-    statuses[targetIdx] = 'Offer';
+    const idx = statuses.findIndex((s) => s !== 'Interview');
+    if (idx >= 0) statuses[idx] = 'Offer';
   }
-  const interviewCount = statuses.filter((s) => s === 'Interview').length;
+  let interviewCount = statuses.filter((s) => s === 'Interview').length;
   if (interviewCount < 2) {
-    // Find non-Offer, non-Interview slots to avoid overwriting guarantees
-    const fillableIdxs = statuses.map((s, i) => (s !== 'Offer' && s !== 'Interview') ? i : -1).filter(i => i >= 0);
-    const needed = 2 - interviewCount;
-    for (let n = 0; n < needed && fillableIdxs.length > 0; n++) {
-      const pick = fillableIdxs.splice(randInt(0, fillableIdxs.length - 1), 1)[0];
-      statuses[pick] = 'Interview';
-    }
+    statuses.forEach((s, i) => {
+      if (interviewCount >= 2) return;
+      if (s !== 'Offer' && s !== 'Interview') { statuses[i] = 'Interview'; interviewCount++; }
+    });
   }
 
   const apps = companies.map((c, i) => {
@@ -187,9 +158,8 @@ export function seedUserData(email) {
     const age = dayOffsets[i];
     const hasFollowUp = status === 'Interview' || status === 'Offer';
     const resumeId = Math.random() > 0.25 ? resumes[randInt(0, resumes.length - 1)].id : '';
-
     return {
-      id: `seed_app_${i}_${e}_${Date.now()}`,
+      id: `seed_app_${i}_${ts}`,
       company: c.company,
       title: c.title,
       date: daysAgo(age),
@@ -204,35 +174,45 @@ export function seedUserData(email) {
     };
   });
 
-  // Pick 5–8 random reminders
   const reminderCount = randInt(5, 8);
-  const pickedReminders = shuffle(REMINDER_POOL).slice(0, reminderCount);
-  const reminders = pickedReminders.map((r, i) => {
+  const reminders = shuffle(REMINDER_POOL).slice(0, reminderCount).map((r, i) => {
     const offsetDays = pick([-7, -4, -2, 0, 1, 2, 3, 5, 7, 10, 12, 14]);
-    const done = offsetDays < 0;
     return {
-      id: `seed_rem_${i}_${e}_${Date.now()}`,
-      title: r.title || r.company || 'Reminder',
+      id: `seed_rem_${i}_${ts}`,
+      title: r.title,
       date: offsetDays >= 0 ? daysFromNow(offsetDays) : daysAgo(-offsetDays),
       time: r.time,
       notes: r.notes || '',
-      done,
+      done: offsetDays < 0,
       createdAt: new Date().toISOString(),
     };
   });
 
-  try {
-    localStorage.setItem(`hivio_applications_${e}`, JSON.stringify(apps));
-    localStorage.setItem(`hivio_resumes_${e}`, JSON.stringify(resumes));
-    localStorage.setItem(`hivio_reminders_${e}`, JSON.stringify(reminders));
-  } catch (err) {
-    console.error('Seed failed:', err);
-  }
+  // Write everything in one batch
+  const batch = writeBatch(db);
+
+  resumes.forEach((r) => {
+    batch.set(doc(db, 'users', uid, 'resumes', r.id), r);
+  });
+  apps.forEach((a) => {
+    batch.set(doc(db, 'users', uid, 'applications', a.id), a);
+  });
+  reminders.forEach((r) => {
+    batch.set(doc(db, 'users', uid, 'reminders', r.id), r);
+  });
+
+  await batch.commit();
 }
 
-export function clearUserData(email) {
-  const e = email.toLowerCase();
-  localStorage.removeItem(`hivio_applications_${e}`);
-  localStorage.removeItem(`hivio_resumes_${e}`);
-  localStorage.removeItem(`hivio_reminders_${e}`);
+// ─── Clear — deletes all subcollections for the current user ──────────────────
+
+export async function clearUserData(uid) {
+  const batch = writeBatch(db);
+
+  for (const sub of ['applications', 'resumes', 'reminders']) {
+    const snap = await getDocs(collection(db, 'users', uid, sub));
+    snap.docs.forEach((d) => batch.delete(d.ref));
+  }
+
+  await batch.commit();
 }

@@ -77,6 +77,8 @@ code {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ================================================================
    AUTOFILL — uses CSS variables so light & dark are handled
    automatically without separate overrides.

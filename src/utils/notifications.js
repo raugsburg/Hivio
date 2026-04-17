@@ -1,5 +1,3 @@
-import { getApplicationsStorageKey, getRemindersStorageKey } from './storage';
-
 export const NOTIF_ENABLED_KEY = 'hivio_notifications_enabled';
 
 // ── Enable / disable ──────────────────────────────────────────────────────────
@@ -40,17 +38,15 @@ export function fireNativeNotification(title, body) {
 }
 
 // ── Persisted shown-IDs (survives page refresh) ───────────────────────────────
-// Stores { "YYYY-MM-DD": ["id1", "id2", ...] } — only keeps today's entries.
 
-function shownIdsKey(user) {
-  const email = (user?.email || 'anonymous').toLowerCase();
-  return `hivio_shown_notifs_${email}`;
+function shownIdsKey(uid) {
+  return `hivio_shown_notifs_${uid || 'anon'}`;
 }
 
-export function getShownNotifIds(user) {
+export function getShownNotifIds(uid) {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const raw = localStorage.getItem(shownIdsKey(user));
+    const raw = localStorage.getItem(shownIdsKey(uid));
     const data = raw ? JSON.parse(raw) : {};
     return new Set(data[today] || []);
   } catch {
@@ -58,61 +54,54 @@ export function getShownNotifIds(user) {
   }
 }
 
-export function markNotifShown(user, id) {
+export function markNotifShown(uid, id) {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const key = shownIdsKey(user);
+    const key = shownIdsKey(uid);
     const raw = localStorage.getItem(key);
     const prev = raw ? JSON.parse(raw) : {};
-    // Only keep today's entries — drops yesterday's automatically
     const next = { [today]: [...(prev[today] || []), id] };
     localStorage.setItem(key, JSON.stringify(next));
   } catch {}
 }
 
-// ── Due notifications (date + time aware) ────────────────────────────────────
+// ── Due notifications — accepts live data from Firestore subscriptions ────────
 
-export function getDueNotifications(user) {
+export function getDueNotifications(apps, reminders) {
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const results = [];
 
   // Follow-up dates from applications
-  try {
-    const apps = JSON.parse(localStorage.getItem(getApplicationsStorageKey(user)) || '[]');
-    apps
-      .filter((a) => !a.archived && a.followUpDate === today)
-      .forEach((a) => {
-        results.push({
-          id: `followup_${a.id}_${today}`,
-          type: 'followup',
-          title: 'Follow-up Today',
-          body: `${a.company}${a.title ? ` · ${a.title}` : ''}`,
-        });
+  (apps || [])
+    .filter((a) => !a.archived && a.followUpDate === today)
+    .forEach((a) => {
+      results.push({
+        id: `followup_${a.id}_${today}`,
+        type: 'followup',
+        title: 'Follow-up Today',
+        body: `${a.company}${a.title ? ` · ${a.title}` : ''}`,
       });
-  } catch {}
+    });
 
-  // Custom reminders — only fire at or after their scheduled time
-  try {
-    const reminders = JSON.parse(localStorage.getItem(getRemindersStorageKey(user)) || '[]');
-    reminders
-      .filter((r) => {
-        if (r.date !== today || r.done) return false;
-        if (!r.time) return true; // no time set → show any time today
-        const [h, m] = r.time.split(':').map(Number);
-        if (!Number.isFinite(h) || !Number.isFinite(m)) return true;
-        return nowMinutes >= h * 60 + m;
-      })
-      .forEach((r) => {
-        results.push({
-          id: `reminder_due_${r.id}_${today}`,
-          type: 'reminder',
-          title: 'Reminder',
-          body: r.title,
-        });
+  // Custom reminders
+  (reminders || [])
+    .filter((r) => {
+      if (r.date !== today || r.done) return false;
+      if (!r.time) return true;
+      const [h, m] = r.time.split(':').map(Number);
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return true;
+      return nowMinutes >= h * 60 + m;
+    })
+    .forEach((r) => {
+      results.push({
+        id: `reminder_due_${r.id}_${today}`,
+        type: 'reminder',
+        title: 'Reminder',
+        body: r.title,
       });
-  } catch {}
+    });
 
   return results;
 }

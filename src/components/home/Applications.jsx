@@ -1,27 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { getApplicationsIntentKey, safeReadJSON } from '../../utils/storage';
+import {
+  subscribeApplications, saveApplication, deleteApplication,
+  subscribeResumes, saveResume,
+} from '../../utils/db';
 import { isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 import { MN_LOCATIONS } from '../../data/mn-locations';
 
 function scrollAppContainerToTop() {
   const el = document.getElementById('app-scroll-container');
   if (el) el.scrollTo({ top: 0, behavior: 'auto' });
-}
-
-function readApps(storageKey) {
-  return safeReadJSON(storageKey, []);
-}
-
-function writeApps(storageKey, apps) {
-  return safeWriteJSON(storageKey, apps);
-}
-
-function readResumes(storageKey) {
-  return safeReadJSON(storageKey, []);
-}
-
-function writeResumes(storageKey, resumes) {
-  safeWriteJSON(storageKey, resumes);
 }
 
 /* Constants */
@@ -141,9 +129,7 @@ function emptyForm() {
 }
 
 function Applications({ user }) {
-  const appsStorageKey = useMemo(() => getApplicationsStorageKey(user), [user]);
-  const resumesStorageKey = useMemo(() => getResumesStorageKey(user), [user]);
-  const intentKey = useMemo(() => getApplicationsIntentKey(user), [user]);
+  const intentKey = useMemo(() => getApplicationsIntentKey(user?.uid), [user]);
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
@@ -177,13 +163,13 @@ function Applications({ user }) {
   const [editResumeFile, setEditResumeFile] = useState(null);
   const [editResumeLabel, setEditResumeLabel] = useState('');
 
+  // Firestore real-time subscriptions
   useEffect(() => {
-    setApps(readApps(appsStorageKey));
-  }, [appsStorageKey]);
-
-  useEffect(() => {
-    setResumes(readResumes(resumesStorageKey));
-  }, [resumesStorageKey]);
+    if (!user?.uid) return;
+    const unsubApps = subscribeApplications(user.uid, setApps);
+    const unsubResumes = subscribeResumes(user.uid, setResumes);
+    return () => { unsubApps(); unsubResumes(); };
+  }, [user?.uid]);
 
   useEffect(() => {
     try {
@@ -215,15 +201,28 @@ function Applications({ user }) {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showResumeMenu]);
 
-  function persistApps(next) {
-    setApps(next);
-    const ok = writeApps(appsStorageKey, next);
-    if (!ok) setError('Save failed — storage may be full. Try removing large resume files.');
+  async function persistApp(app) {
+    try {
+      await saveApplication(user.uid, app);
+    } catch {
+      setError('Save failed. Please try again.');
+    }
   }
 
-  function persistResumes(next) {
-    setResumes(next);
-    writeResumes(resumesStorageKey, next);
+  async function removeApp(appId) {
+    try {
+      await deleteApplication(user.uid, appId);
+    } catch {
+      setError('Delete failed. Please try again.');
+    }
+  }
+
+  async function persistResume(resume) {
+    try {
+      await saveResume(user.uid, resume);
+    } catch {
+      setError('Resume save failed. Please try again.');
+    }
   }
 
   function validate(form) {
@@ -243,15 +242,6 @@ function Applications({ user }) {
       return 'File is too large. Please upload a file under 5MB.';
     }
     return '';
-  }
-
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   }
 
   function resumeLabelById(resumeId) {
@@ -355,7 +345,7 @@ function Applications({ user }) {
     setEditForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function saveNewApp() {
+  async function saveNewApp() {
     setError('');
     setSuccess('');
 
@@ -380,13 +370,13 @@ function Applications({ user }) {
       updatedAt: new Date().toISOString(),
     };
 
-    persistApps([newApp, ...apps]);
+    await persistApp(newApp);
     setView('list');
     scrollAppContainerToTop();
     setSuccess('Application added.');
   }
 
-  function saveEditsAndClose() {
+  async function saveEditsAndClose() {
     if (!editingApp) return;
 
     setError('');
@@ -398,42 +388,40 @@ function Applications({ user }) {
       return;
     }
 
-    const next = apps.map((a) =>
-      a.id === editingApp.id
-        ? {
-            ...a,
-            company: editForm.company.trim(),
-            title: editForm.title.trim(),
-            date: editForm.date,
-            status: editForm.status,
-            followUpDate: editForm.followUpDate,
-            location: editForm.location.trim(),
-            notes: editForm.notes.trim(),
-            resumeId: editForm.resumeId,
-            updatedAt: new Date().toISOString(),
-          }
-        : a
-    );
+    const updated = {
+      ...editingApp,
+      company: editForm.company.trim(),
+      title: editForm.title.trim(),
+      date: editForm.date,
+      status: editForm.status,
+      followUpDate: editForm.followUpDate,
+      location: editForm.location.trim(),
+      notes: editForm.notes.trim(),
+      resumeId: editForm.resumeId,
+      updatedAt: new Date().toISOString(),
+    };
 
-    persistApps(next);
+    await persistApp(updated);
     setView('list');
     setEditingApp(null);
     scrollAppContainerToTop();
     setSuccess('Application updated.');
   }
 
-  function handleDelete(appId) {
-    persistApps(apps.filter((a) => a.id !== appId));
+  async function handleDelete(appId) {
+    await removeApp(appId);
     setOpenMenuId(null);
   }
 
-  function handleArchive(appId) {
-    persistApps(apps.map((a) => (a.id === appId ? { ...a, archived: true } : a)));
+  async function handleArchive(appId) {
+    const app = apps.find((a) => a.id === appId);
+    if (app) await persistApp({ ...app, archived: true });
     setOpenMenuId(null);
   }
 
-  function handleUnarchive(appId) {
-    persistApps(apps.map((a) => (a.id === appId ? { ...a, archived: false } : a)));
+  async function handleUnarchive(appId) {
+    const app = apps.find((a) => a.id === appId);
+    if (app) await persistApp({ ...app, archived: false });
   }
 
   function handleAddResumeFilePick() {
@@ -474,7 +462,6 @@ function Applications({ user }) {
     }
 
     try {
-      const dataUrl = await fileToDataUrl(addResumeFile);
       const newResume = {
         id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
         fileName: addResumeFile.name,
@@ -482,10 +469,9 @@ function Applications({ user }) {
         fileSize: addResumeFile.size,
         label: addResumeLabel.trim(),
         uploadedAt: new Date().toISOString(),
-        dataUrl,
       };
 
-      persistResumes([newResume, ...resumes]);
+      await persistResume(newResume);
       setAddForm((prev) => ({ ...prev, resumeId: newResume.id }));
 
       setAddResumeFile(null);
@@ -493,9 +479,9 @@ function Applications({ user }) {
       if (addResumeInputRef.current) addResumeInputRef.current.value = '';
 
       setShowAddResumeUpload(false);
-      setSuccess('Resume uploaded and linked.');
+      setSuccess('Resume linked.');
     } catch {
-      setError('Resume upload failed. Please try again.');
+      setError('Resume save failed. Please try again.');
     }
   }
 
@@ -537,7 +523,6 @@ function Applications({ user }) {
     }
 
     try {
-      const dataUrl = await fileToDataUrl(editResumeFile);
       const newResume = {
         id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
         fileName: editResumeFile.name,
@@ -545,10 +530,9 @@ function Applications({ user }) {
         fileSize: editResumeFile.size,
         label: editResumeLabel.trim(),
         uploadedAt: new Date().toISOString(),
-        dataUrl,
       };
 
-      persistResumes([newResume, ...resumes]);
+      await persistResume(newResume);
       setEditForm((prev) => ({ ...prev, resumeId: newResume.id }));
 
       setEditResumeFile(null);
@@ -556,9 +540,9 @@ function Applications({ user }) {
       if (editResumeInputRef.current) editResumeInputRef.current.value = '';
 
       setShowEditResumeUpload(false);
-      setSuccess('Resume uploaded and linked.');
+      setSuccess('Resume linked.');
     } catch {
-      setError('Resume upload failed. Please try again.');
+      setError('Resume save failed. Please try again.');
     }
   }
 
