@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../firebase';
+import { EMAIL_REGEX } from '../../utils/validate';
 
 function ForgotPassword({ onSwitchToLogin }) {
   const [email, setEmail] = useState('');
@@ -15,6 +16,10 @@ function ForgotPassword({ onSwitchToLogin }) {
 
     if (!email.trim()) {
       setError('Please enter your email address.');
+      return;
+    }
+    if (!EMAIL_REGEX.test(email.trim())) {
+      setError('Please enter a valid email address (e.g. name@example.com).');
       return;
     }
 
@@ -38,112 +43,61 @@ function ForgotPassword({ onSwitchToLogin }) {
     }
   }
 
-  const inputStyle = {
-    width: '100%',
-    background: 'var(--bg-card)',
-    border: '1.5px solid var(--border)',
-    color: 'var(--text-1)',
-    borderRadius: 14,
-    padding: '13px 16px',
-    fontSize: 14,
-    outline: 'none',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
-    fontFamily: "'DM Sans', sans-serif",
-    boxSizing: 'border-box',
-  };
-
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', minHeight: '100%',
-      background: 'var(--bg-app)', padding: '0 24px',
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 72, paddingBottom: 40 }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%',
-          background: 'var(--brand-light)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', marginBottom: 20,
-        }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex flex-col min-h-full px-6 bg-hivio-bg dark:bg-hivio-bg-dark">
+      <div className="flex flex-col items-center pt-[72px] pb-10">
+        <div className="w-16 h-16 rounded-full bg-hivio-primary-light dark:bg-hivio-primary/15 flex items-center justify-center mb-5">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
-        <h1 style={{
-          fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700,
-          color: 'var(--text-1)', margin: '0 0 8px', textAlign: 'center',
-        }}>
+        <h1 className="text-2xl font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark mb-2 text-center">
           Reset Password
         </h1>
-        <p style={{
-          color: 'var(--text-3)', fontSize: 13, fontFamily: "'DM Sans', sans-serif",
-          textAlign: 'center', margin: 0, lineHeight: 1.5,
-        }}>
+        <p className="text-sm text-hivio-text-secondary dark:text-hivio-text-secondary-dark text-center">
           Enter your email and we'll send you a reset link.
         </p>
       </div>
 
-      <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <form onSubmit={handleReset} noValidate className="flex flex-col gap-3">
         <div>
-          <label style={{
-            display: 'block', fontSize: 11, fontWeight: 700,
-            fontFamily: "'Syne', sans-serif", color: 'var(--text-2)',
-            letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6,
-          }}>Email</label>
+          <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => { setEmail(e.target.value); setError(''); setSuccess(''); }}
             placeholder="student@university.edu"
-            style={inputStyle}
-            onFocus={e => { e.target.style.borderColor = 'var(--brand)'; e.target.style.boxShadow = '0 0 0 3px var(--brand-glow)'; }}
-            onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+            className="w-full text-sm font-normal text-hivio-text-primary dark:text-hivio-text-primary-dark bg-hivio-surface dark:bg-hivio-surface-dark border border-hivio-border dark:border-hivio-border-dark rounded-sm px-3 py-2 shadow-hivio-sm placeholder:text-hivio-text-muted dark:placeholder:text-hivio-text-muted-dark focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 ease-in-out"
           />
         </div>
 
         {error && (
-          <div style={{
-            background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)',
-            color: '#DC2626', fontSize: 13, fontWeight: 500,
-            padding: '11px 14px', borderRadius: 12, fontFamily: "'DM Sans', sans-serif",
-          }}>{error}</div>
+          <div className="bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
+            {error}
+          </div>
         )}
 
         {success && (
-          <div style={{
-            background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)',
-            color: '#059669', fontSize: 13, fontWeight: 500,
-            padding: '11px 14px', borderRadius: 12, fontFamily: "'DM Sans', sans-serif",
-          }}>{success}</div>
+          <div className="bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
+            {success}
+          </div>
         )}
 
         <button
           type="submit"
           disabled={loading || !!success}
-          style={{
-            width: '100%', background: 'var(--brand)', color: '#FFFFFF',
-            fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15,
-            letterSpacing: '0.05em', padding: '14px', borderRadius: 14,
-            border: 'none', cursor: (loading || success) ? 'not-allowed' : 'pointer',
-            marginTop: 4, boxShadow: 'var(--shadow-btn)', opacity: (loading || success) ? 0.7 : 1,
-          }}
+          className="w-full bg-hivio-primary text-hivio-text-inverse text-sm font-medium px-4 py-3 rounded-md shadow-hivio-sm hover:bg-hivio-primary-hover transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed mt-1"
         >
           {loading ? 'Sending…' : 'Send Reset Email'}
         </button>
       </form>
 
-      <p style={{
-        textAlign: 'center', color: 'var(--text-2)',
-        fontSize: 13, marginTop: 28, fontFamily: "'DM Sans', sans-serif",
-      }}>
+      <p className="text-center text-sm text-hivio-text-secondary dark:text-hivio-text-secondary-dark mt-7">
         <button
           type="button"
           onClick={onSwitchToLogin}
-          style={{
-            color: 'var(--brand)', fontWeight: 700, background: 'none',
-            border: 'none', cursor: 'pointer', padding: 0,
-            fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-          }}
+          className="text-hivio-primary bg-transparent text-sm font-medium hover:text-hivio-primary-hover transition-colors duration-150 ease-in-out"
         >
           ← Back to Sign In
         </button>

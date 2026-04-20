@@ -60,7 +60,7 @@ export function markNotifShown(uid, id) {
     const key = shownIdsKey(uid);
     const raw = localStorage.getItem(key);
     const prev = raw ? JSON.parse(raw) : {};
-    const next = { [today]: [...(prev[today] || []), id] };
+    const next = { ...prev, [today]: [...(prev[today] || []), id] };
     localStorage.setItem(key, JSON.stringify(next));
   } catch {}
 }

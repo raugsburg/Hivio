@@ -14,7 +14,6 @@ export const DEFAULT_DASHBOARD_WIDGETS = {
   resumePerformance: true,
   upcomingTasks: true,
   recentApps: true,
-  rejectionRate: false
 };
 
 // Order of widget slots on the Dashboard

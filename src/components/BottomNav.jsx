@@ -81,12 +81,8 @@ function BottomNav({ activeTab, onTabChange }) {
 
   return (
     <nav
-      style={{
-        background: 'var(--bg-card)',
-        borderTop: '1px solid var(--border)',
-        boxShadow: 'var(--shadow-nav)',
-      }}
-      className="pt-2 pb-4 px-1"
+      style={{ boxShadow: 'var(--shadow-nav)' }}
+      className="pt-2 pb-4 px-1 bg-hivio-surface dark:bg-hivio-surface-dark border-t border-hivio-border dark:border-hivio-border-dark"
     >
       <div className="flex justify-around items-center">
         {tabs.map(tab => {
@@ -95,43 +91,19 @@ function BottomNav({ activeTab, onTabChange }) {
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className="flex flex-col items-center gap-1 min-w-[60px] min-h-[48px] justify-center transition-all duration-200 relative"
-              style={{ color: active ? 'var(--brand)' : 'var(--text-3)' }}
+              className={`flex flex-col items-center gap-1 min-w-[60px] min-h-[48px] justify-center relative transition-colors duration-150 ease-in-out ${
+                active ? 'text-hivio-primary' : 'text-hivio-text-muted dark:text-hivio-text-muted-dark'
+              }`}
             >
               {active && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 32,
-                    height: 3,
-                    borderRadius: '0 0 4px 4px',
-                    background: 'var(--brand)',
-                  }}
-                />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-b bg-hivio-primary" />
               )}
-              <div
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 10,
-                  background: active ? 'var(--brand-light)' : 'transparent',
-                  transition: 'background 0.2s',
-                }}
-              >
+              <div className={`px-3 py-1 rounded-md transition-colors duration-150 ease-in-out ${
+                active ? 'bg-hivio-primary-light dark:bg-hivio-primary/15' : 'bg-transparent'
+              }`}>
                 {tab.icon(active)}
               </div>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: active ? 700 : 500,
-                  letterSpacing: '0.01em',
-                  lineHeight: 1.6,
-                  paddingBottom: 1,
-                }}
-              >
+              <span className={`text-xs leading-snug ${active ? 'font-semibold' : 'font-medium'}`}>
                 {tab.label}
               </span>
             </button>

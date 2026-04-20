@@ -33,6 +33,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null); // merged Firebase Auth + Firestore profile
   const [screen, setScreen] = useState('loading');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [openAppId, setOpenAppId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [notificationsEnabled, setNotifsEnabled] = useState(getNotificationsEnabled);
   const scheduledTimeouts = useRef([]);
@@ -175,7 +176,7 @@ function App() {
   function renderActiveTab() {
     switch (activeTab) {
       case 'applications':
-        return <Applications user={currentUser} />;
+        return <Applications user={currentUser} openAppId={openAppId} onOpenAppIdConsumed={() => setOpenAppId(null)} />;
       case 'resumes':
         return <Resumes user={currentUser} />;
       case 'calendar':
@@ -186,6 +187,7 @@ function App() {
         return (
           <Settings
             user={currentUser}
+            apps={liveApps}
             onLogout={handleLogout}
             onUpdateUser={setCurrentUser}
             notificationsEnabled={notificationsEnabled}
@@ -194,7 +196,7 @@ function App() {
           />
         );
       default:
-        return <Dashboard user={currentUser} onTabChange={setActiveTab} />;
+        return <Dashboard user={currentUser} onTabChange={setActiveTab} onOpenApp={(id) => { setOpenAppId(id); setActiveTab('applications'); }} />;
     }
   }
 

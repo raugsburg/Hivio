@@ -6,32 +6,32 @@
    DESIGN TOKENS
    ================================================================ */
 :root {
-  --brand:         #1B6CA8;
-  --brand-deep:    #134F7D;
-  --brand-hover:   #156096;
-  --brand-light:   #E8F3FB;
-  --brand-glow:    rgba(27, 108, 168, 0.22);
+  --brand:         #6366F1;
+  --brand-deep:    #4F46E5;
+  --brand-hover:   #4F46E5;
+  --brand-light:   #EEF2FF;
+  --brand-glow:    rgba(99, 102, 241, 0.22);
 
-  --bg-app:        #EEF3F9;
+  --bg-app:        #FAFAFA;
   --bg-card:       #FFFFFF;
-  --bg-input:      #F4F7FA;
-  --bg-hover:      #F0F5FA;
-  --border:        #DDE4EE;
-  --border-strong: #C8D2E0;
+  --bg-input:      #F9FAFB;
+  --bg-hover:      #F3F4F6;
+  --border:        #E5E7EB;
+  --border-strong: #D1D5DB;
 
-  --text-1:        #0B1623;
-  --text-2:        #4E6278;
-  --text-3:        #8FA4B5;
+  --text-1:        #111827;
+  --text-2:        #6B7280;
+  --text-3:        #9CA3AF;
 
-  --status-applied:   #1B6CA8;
-  --status-interview: #6D28D9;
-  --status-offer:     #047857;
-  --status-rejected:  #64748B;
+  --status-applied:    #3B82F6;
+  --status-interview:  #F59E0B;
+  --status-offer:      #10B981;
+  --status-rejected:   #EF4444;
 
-  --shadow-card:  0 1px 4px rgba(11,22,35,0.06), 0 4px 16px rgba(11,22,35,0.07);
-  --shadow-nav:   0 -1px 0 rgba(11,22,35,0.07), 0 -6px 20px rgba(11,22,35,0.05);
-  --shadow-input: 0 1px 3px rgba(11,22,35,0.06);
-  --shadow-btn:   0 4px 14px rgba(27,108,168,0.28);
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-nav:   0 -1px 0 rgba(0,0,0,0.07), 0 -6px 20px rgba(0,0,0,0.05);
+  --shadow-input: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-btn:   0 4px 14px rgba(99,102,241,0.28);
 }
 
 html.dark {
@@ -46,29 +46,30 @@ html.dark {
   --text-2:        #7A96AB;
   --text-3:        #3D5568;
 
-  --brand-light:   rgba(27, 108, 168, 0.15);
-  --brand-glow:    rgba(27, 108, 168, 0.3);
+  --brand:         #6366F1;
+  --brand-deep:    #4F46E5;
+  --brand-hover:   #4F46E5;
+  --brand-light:   rgba(99, 102, 241, 0.15);
+  --brand-glow:    rgba(99, 102, 241, 0.3);
 
   --shadow-card:  0 1px 4px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.28);
   --shadow-nav:   0 -1px 0 rgba(255,255,255,0.05), 0 -6px 20px rgba(0,0,0,0.3);
   --shadow-input: 0 1px 3px rgba(0,0,0,0.2);
-  --shadow-btn:   0 4px 14px rgba(27,108,168,0.35);
+  --shadow-btn:   0 4px 14px rgba(99,102,241,0.35);
 }
 
 /* ================================================================
    BASE
    ================================================================ */
 body {
+  @apply bg-hivio-bg text-hivio-text-secondary font-sans antialiased;
   margin: 0;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
   line-height: 1.55;
 }
 
 code {
-  font-family: 'DM Mono', source-code-pro, Menlo, Monaco, Consolas, monospace;
+  font-family: 'Inter', source-code-pro, Menlo, Monaco, Consolas, monospace;
 }
 
 /* ================================================================
@@ -128,69 +129,7 @@ html.dark .select-field {
   display: none;
 }
 
-/* ================================================================
-   GLOBAL APP BACKGROUND SYNC
-   All page-level containers in the scrollable app area should use
-   the CSS variable so they stay in sync with the design tokens.
-   ================================================================ */
-#app-scroll-container > div {
-  background-color: var(--bg-app) !important;
-}
 
-/* ================================================================
-   CARD BACKGROUNDS — sync Tailwind bg-white / dark:bg-slate-900
-   ================================================================ */
-.phone-content .bg-white {
-  background-color: var(--bg-card) !important;
-}
-.dark .phone-content .dark\:bg-slate-900 {
-  background-color: var(--bg-card) !important;
-}
-/* Deeper dark bg used in some places */
-.dark .phone-content .dark\:bg-slate-950 {
-  background-color: var(--bg-app) !important;
-}
-
-/* ================================================================
-   BORDER SYNC
-   ================================================================ */
-.dark .phone-content .dark\:border-slate-800 {
-  border-color: var(--border) !important;
-}
-.dark .phone-content .dark\:border-slate-700 {
-  border-color: var(--border) !important;
-}
-
-/* ================================================================
-   INPUT BACKGROUNDS SYNC
-   ================================================================ */
-.phone-content .bg-slate-50,
-.phone-content .bg-\[#F7F9FC\] {
-  background-color: var(--bg-input) !important;
-}
-.dark .phone-content .dark\:bg-slate-950 {
-  background-color: var(--bg-input) !important;
-}
-
-/* ================================================================
-   BRAND BUTTON SYNC — bg-[#2C6E91] → var(--brand)
-   ================================================================ */
-.phone-content .bg-\[\#2C6E91\] {
-  background-color: var(--brand) !important;
-}
-.phone-content .hover\:bg-\[\#1a4a66\]:hover {
-  background-color: var(--brand-deep) !important;
-}
-
-/* ================================================================
-   FOCUS RING SYNC — focus:ring-[#2C6E91]/30 → brand glow
-   ================================================================ */
-.phone-content .focus\:border-\[\#2C6E91\]:focus {
-  border-color: var(--brand) !important;
-}
-.phone-content .focus\:ring-\[\#2C6E91\]\/30:focus {
-  --tw-ring-color: var(--brand-glow) !important;
-}
 
 /* ================================================================
    TYPOGRAPHY REFINEMENT

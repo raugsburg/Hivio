@@ -3,7 +3,7 @@ import './PhoneFrame.css';
 
 export default function PhoneFrame({ children }) {
   return (
-    <div className="phone-frame">
+    <div className="phone-frame" id="phone-frame">
       <div className="phone-notch" />
       <div className="phone-content" id="app-scroll-container">
         {children}
