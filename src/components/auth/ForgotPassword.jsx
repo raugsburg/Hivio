@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import bcrypt from 'bcryptjs';
-import { getUser, saveUser } from '../../utils/storage';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../firebase';
+import { EMAIL_REGEX } from '../../utils/validate';
 
 function ForgotPassword({ onSwitchToLogin }) {
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleReset(e) {
     e.preventDefault();
@@ -16,132 +15,91 @@ function ForgotPassword({ onSwitchToLogin }) {
     setSuccess('');
 
     if (!email.trim()) {
-      setError('Please enter your email');
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!EMAIL_REGEX.test(email.trim())) {
+      setError('Please enter a valid email address (e.g. name@example.com).');
       return;
     }
 
-    if (!newPassword || !confirmNewPassword) {
-      setError('Please enter and confirm your new password');
-      return;
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setSuccess('Password reset email sent. Check your inbox.');
+    } catch (err) {
+      switch (err.code) {
+        case 'auth/user-not-found':
+          setError('No account found with that email.');
+          break;
+        case 'auth/invalid-email':
+          setError('Enter a valid email address.');
+          break;
+        default:
+          setError('Failed to send reset email. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    const user = getUser(email.trim());
-    if (!user) {
-      setError('No account found. Please register first.');
-      return;
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 10);
-    const updatedUser = { ...user, password: hashed };
-    saveUser(updatedUser);
-
-    setSuccess('Password reset successfully. You can now sign in.');
-    setNewPassword('');
-    setConfirmNewPassword('');
   }
 
   return (
-    <div className="flex flex-col min-h-screen px-8 pt-16 pb-8 justify-start bg-[#F7F9FC] dark:bg-slate-950">
-      <div className="flex flex-col items-center mb-8">
-        <img src="/hivio-logo.svg" alt="Hivio" className="w-28 h-28 mb-3" />
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-2">
+    <div className="flex flex-col min-h-full px-6 bg-hivio-bg dark:bg-hivio-bg-dark">
+      <div className="flex flex-col items-center pt-[72px] pb-10">
+        <div className="w-16 h-16 rounded-full bg-hivio-primary-light dark:bg-hivio-primary/15 flex items-center justify-center mb-5">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark mb-2 text-center">
           Reset Password
         </h1>
-        <p className="text-slate-500 dark:text-slate-300 text-center font-medium">
-          Enter your email and choose a new password.
+        <p className="text-sm text-hivio-text-secondary dark:text-hivio-text-secondary-dark text-center">
+          Enter your email and we'll send you a reset link.
         </p>
       </div>
 
-      <form onSubmit={handleReset} className="space-y-5">
+      <form onSubmit={handleReset} noValidate className="flex flex-col gap-3">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-            Email
-          </label>
+          <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Email</label>
           <input
             type="email"
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (error) setError('');
-              if (success) setSuccess('');
-            }}
+            onChange={(e) => { setEmail(e.target.value); setError(''); setSuccess(''); }}
             placeholder="student@university.edu"
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-            New Password
-          </label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => {
-              setNewPassword(e.target.value);
-              if (error) setError('');
-              if (success) setSuccess('');
-            }}
-            placeholder="At least 8 characters"
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-            Confirm New Password
-          </label>
-          <input
-            type="password"
-            value={confirmNewPassword}
-            onChange={(e) => {
-              setConfirmNewPassword(e.target.value);
-              if (error) setError('');
-              if (success) setSuccess('');
-            }}
-            placeholder="••••••••"
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all"
+            className="w-full text-sm font-normal text-hivio-text-primary dark:text-hivio-text-primary-dark bg-hivio-surface dark:bg-hivio-surface-dark border border-hivio-border dark:border-hivio-border-dark rounded-sm px-3 py-2 shadow-hivio-sm placeholder:text-hivio-text-muted dark:placeholder:text-hivio-text-muted-dark focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 ease-in-out"
           />
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
             {success}
           </div>
         )}
 
         <button
           type="submit"
-          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-4"
+          disabled={loading || !!success}
+          className="w-full bg-hivio-primary text-hivio-text-inverse text-sm font-medium px-4 py-3 rounded-md shadow-hivio-sm hover:bg-hivio-primary-hover transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed mt-1"
         >
-          Reset Password
+          {loading ? 'Sending…' : 'Send Reset Email'}
         </button>
       </form>
 
-      <p className="text-center text-slate-500 dark:text-slate-300 text-sm mt-8 font-medium">
-        Remembered it?{' '}
+      <p className="text-center text-sm text-hivio-text-secondary dark:text-hivio-text-secondary-dark mt-7">
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="text-[#2C6E91] font-semibold hover:underline"
+          className="text-hivio-primary bg-transparent text-sm font-medium hover:text-hivio-primary-hover transition-colors duration-150 ease-in-out"
         >
-          Back to Sign In
+          ← Back to Sign In
         </button>
       </p>
     </div>

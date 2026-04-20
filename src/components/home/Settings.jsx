@@ -3,9 +3,11 @@ import AutocompleteInput from '../common/Autocompleteinput';
 import { MN_SCHOOLS } from '../../data/schools-mn';
 import { COMMON_MAJORS } from '../../data/majors';
 import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS, DEFAULT_DASHBOARD_ORDER, DASHBOARD_ORDER_LABELS } from '../../data/constants';
-import { getUser, saveUser } from '../../utils/storage';
+import { MAJOR_ABBREVIATIONS } from '../../data/majors';
+import { SCHOOL_ABBREVIATIONS } from '../../data/schools-mn';
+import { submitFeedback, saveUserProfile, subscribeResumes } from '../../utils/db';
 import { getStoredTheme, storeTheme, applyThemeClass } from '../../utils/theme';
-import { EMAIL_REGEX } from '../../utils/validate';
+
 
 function normalizeText(s) {
   return (s || '').trim().replace(/\s+/g, ' ');
@@ -27,42 +29,38 @@ function FeedbackCard({ user }) {
       comment: comment.trim(),
       submittedAt: new Date().toISOString(),
     };
-    try {
-      const key = 'hivio_feedback';
-      const prev = JSON.parse(localStorage.getItem(key) || '[]');
-      localStorage.setItem(key, JSON.stringify([entry, ...prev]));
-    } catch {}
+    submitFeedback(entry).catch(() => {});
     setSubmitted(true);
     setTimeout(() => { setOpen(false); setSubmitted(false); setRating(0); setComment(''); }, 2000);
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 overflow-hidden mb-6">
+    <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark overflow-hidden mb-6">
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
+        className="w-full flex items-center justify-between p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 min-h-[44px]"
       >
         <div>
-          <p className="font-semibold text-slate-700 dark:text-slate-200 text-left">Share Feedback</p>
-          <p className="text-xs text-slate-400 mt-0.5 text-left">Report a bug or share what's working</p>
+          <p className="font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark text-left">Share Feedback</p>
+          <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark mt-0.5 text-left">Report a bug or share what's working</p>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-300 dark:text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-hivio-text-muted dark:text-hivio-text-muted-dark transition-transform ${open ? 'rotate-90' : ''}`}>
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+        <div className="px-4 pb-4 border-t border-[#C4CDD6] dark:border-hivio-border-dark pt-4">
           {submitted ? (
             <div className="text-center py-4">
-              <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Thanks for your feedback!</p>
-              <p className="text-xs text-slate-400 mt-1">It helps us build a better experience.</p>
+              <p className="text-sm font-bold text-hivio-status-offer">Thanks for your feedback!</p>
+              <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark mt-1">It helps us build a better experience.</p>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">How would you rate Hivio?</p>
+                <p className="text-xs font-medium text-hivio-text-secondary dark:text-hivio-text-secondary-dark mb-2">How would you rate Hivio?</p>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -82,7 +80,7 @@ function FeedbackCard({ user }) {
                     </button>
                   ))}
                   {rating > 0 && (
-                    <span className="text-xs font-semibold text-slate-400 ml-2">
+                    <span className="text-xs font-medium text-hivio-text-muted dark:text-hivio-text-muted-dark ml-2">
                       {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][rating]}
                     </span>
                   )}
@@ -94,14 +92,14 @@ function FeedbackCard({ user }) {
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Any comments or suggestions? (optional)"
                 rows={3}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all resize-none"
+                className="w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 resize-none placeholder:text-hivio-text-muted"
               />
 
               <button
                 type="button"
                 onClick={submit}
                 disabled={!rating}
-                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+                className="w-full bg-hivio-primary hover:bg-hivio-primary-hover disabled:opacity-40 disabled:cursor-not-allowed text-hivio-text-inverse font-medium py-2.5 rounded-md transition-colors duration-150 text-sm"
               >
                 Submit Feedback
               </button>
@@ -113,8 +111,122 @@ function FeedbackCard({ user }) {
   );
 }
 
-function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggleNotifications, onTabChange }) {
+function Settings({ user, apps = [], onLogout, onUpdateUser, notificationsEnabled, onToggleNotifications, onTabChange }) {
   const [view, setView] = useState('main'); // main | account | dashboard
+  const [resumes, setResumes] = useState([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeResumes(user.uid, setResumes);
+    return () => unsub();
+  }, [user?.uid]);
+
+  function exportCSV() {
+    const activeApps = apps.filter((a) => !a.archived);
+    if (activeApps.length === 0) return;
+    const resumeLabel = (id) => {
+      const r = resumes.find((x) => x.id === id);
+      return r ? r.label || r.fileName : '';
+    };
+    const headers = ['Company', 'Job Title', 'Status', 'Date Applied', 'Follow-up Date', 'Location', 'Resume', 'Notes'];
+    const rows = activeApps.map((a) => [
+      a.company || '', a.title || '', a.status || '', a.date || '',
+      a.followUpDate || '', a.location || '', resumeLabel(a.resumeId), a.notes || '',
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    try {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hivio_report_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setExportFeedback({ msg: 'Exported successfully.', ok: true });
+      setTimeout(() => setExportFeedback({ msg: '', ok: true }), 3000);
+    } catch {
+      setExportFeedback({ msg: 'Export failed. Please try again.', ok: false });
+    }
+  }
+
+  function exportPDF() {
+    const activeApps = apps.filter((a) => !a.archived);
+    const isDark = document.documentElement.classList.contains('dark');
+    const c = isDark ? {
+      bg: '#0f172a', surface: '#1e293b', border: '#334155',
+      text: '#f1f5f9', muted: '#94a3b8', subtle: '#475569',
+      tableHead: '#1e293b', tableRow: '#0f172a',
+    } : {
+      bg: '#ffffff', surface: '#f8fafc', border: '#e2e8f0',
+      text: '#1e293b', muted: '#64748b', subtle: '#94a3b8',
+      tableHead: '#f1f5f9', tableRow: '#f8fafc',
+    };
+    const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    const total = activeApps.length;
+    const interviewed = activeApps.filter((a) => a.status === 'Interview' || a.status === 'Offer').length;
+    const offered = activeApps.filter((a) => a.status === 'Offer').length;
+    const rejected = activeApps.filter((a) => a.status === 'Rejected').length;
+    const applied = activeApps.filter((a) => a.status === 'Applied').length;
+    const interviewRate = total > 0 ? Math.round((interviewed / total) * 100) : 0;
+    const offerRate = total > 0 ? Math.round((offered / total) * 100) : 0;
+    const recent = [...activeApps].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
+    const td = `padding:8px 12px;border-bottom:1px solid ${c.border};font-size:13px;color:${c.text}`;
+    const recentRows = recent.map((a) =>
+      `<tr><td style="${td}">${a.company}</td><td style="${td}">${a.title}</td><td style="${td};color:#6366F1;font-weight:600">${a.status}</td><td style="${td};color:${c.muted}">${a.date || ''}</td></tr>`
+    ).join('');
+    const statusRows = [
+      { label: 'Applied', value: applied, color: '#6366F1' },
+      { label: 'Interview', value: interviewed, color: '#0F766E' },
+      { label: 'Offer', value: offered, color: '#D97706' },
+      { label: 'Rejected', value: rejected, color: '#64748B' },
+    ];
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Hivio Job Search Report — ${user.name || ''}</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:${c.text}; background:${c.bg}; padding:40px; }
+@media print { body { padding:20px; } }
+.header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #6366F1; padding-bottom:16px; margin-bottom:28px; }
+.logo { font-size:22px; font-weight:900; color:#6366F1; letter-spacing:-0.5px; }
+.meta { text-align:right; font-size:12px; color:${c.muted}; line-height:1.8; }
+.section { margin-bottom:28px; }
+.section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:${c.subtle}; margin-bottom:12px; }
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.stat-box { background:${c.surface}; border:1px solid ${c.border}; border-radius:12px; padding:14px 16px; }
+.stat-label { font-size:10px; font-weight:700; text-transform:uppercase; color:${c.subtle}; letter-spacing:0.08em; }
+.stat-value { font-size:26px; font-weight:900; margin-top:4px; color:${c.text}; }
+.status-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.status-box { border-radius:10px; padding:12px; text-align:center; background:${c.surface}; border:1px solid ${c.border}; }
+.status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-bottom:6px; }
+.status-count { font-size:20px; font-weight:900; }
+.status-name { font-size:11px; color:${c.muted}; font-weight:600; margin-top:2px; }
+table { width:100%; border-collapse:collapse; background:${c.surface}; border:1px solid ${c.border}; border-radius:10px; overflow:hidden; }
+th { padding:10px 12px; background:${c.tableHead}; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:${c.muted}; text-align:left; border-bottom:1px solid ${c.border}; }
+.footer { margin-top:32px; padding-top:14px; border-top:1px solid ${c.border}; font-size:11px; color:${c.subtle}; text-align:center; }
+</style></head><body>
+<div class="header"><div class="logo">Hivio</div><div class="meta"><strong style="color:${c.text}">${user.name || 'Job Seeker'}</strong><br/>${user.email || ''}<br/>Generated ${date}</div></div>
+<div class="section"><div class="section-title">Application Snapshot</div><div class="stat-grid">
+<div class="stat-box"><div class="stat-label">Total Active</div><div class="stat-value" style="color:#6366F1">${total}</div></div>
+<div class="stat-box"><div class="stat-label">Interview Rate</div><div class="stat-value" style="color:#0F766E">${interviewRate}%</div></div>
+<div class="stat-box"><div class="stat-label">Offer Rate</div><div class="stat-value" style="color:#D97706">${offerRate}%</div></div>
+<div class="stat-box"><div class="stat-label">Interviews Landed</div><div class="stat-value">${interviewed}</div></div>
+</div></div>
+<div class="section"><div class="section-title">Status Breakdown</div><div class="status-grid">
+${statusRows.map((s) => `<div class="status-box"><div><span class="status-dot" style="background:${s.color}"></span></div><div class="status-count" style="color:${s.color}">${s.value}</div><div class="status-name">${s.label}</div></div>`).join('')}
+</div></div>
+${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Applications</div><table><thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Date</th></tr></thead><tbody>${recentRows}</tbody></table></div>` : ''}
+<div class="footer">Generated by Hivio &middot; Job Application Tracker</div>
+</body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+  }
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
 
@@ -140,8 +252,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   const initialForm = useMemo(() => {
     return {
       // account/basic
-      name: user?.name || '',
-      email: user?.email || '',
+      firstName: user?.name ? user.name.split(' ')[0] : '',
+      lastName: user?.name ? user.name.split(' ').slice(1).join(' ') : '',
       avatarUrl: user?.avatarUrl || '',
 
       // profile (standardized like ProfileSetup)
@@ -150,16 +262,20 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
       gradYear: user?.profile?.gradYear || '',
       interests: Array.isArray(user?.profile?.interests) ? user.profile.interests : [],
 
+      // weekly application goal
+      weeklyGoalTarget: user?.weeklyGoalTarget || 5,
+
       // dashboard widgets
       dashboardWidgets: user?.dashboardWidgets || { ...DEFAULT_DASHBOARD_WIDGETS },
 
       // dashboard widget order — merge saved order with defaults so newly-added widgets always appear
       dashboardOrder: (() => {
+        const REMOVED = ['weeklyGoal', 'statusBreakdown'];
         const saved = Array.isArray(user?.dashboardOrder) ? [...user.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER];
         for (const id of DEFAULT_DASHBOARD_ORDER) {
           if (!saved.includes(id)) saved.push(id);
         }
-        return saved;
+        return saved.filter((id) => !REMOVED.includes(id));
       })()
     };
   }, [user]);
@@ -167,27 +283,29 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState({ msg: '', ok: true });
 
   const photoInputRef = useRef(null);
 
   useEffect(() => {
     setForm(initialForm);
-  }, [initialForm]);
+  }, [view]);
 
   useEffect(() => {
     setError('');
     setSuccess('');
   }, [view]);
 
-  const pageWrap = 'flex flex-col min-h-full px-5 py-6 bg-[#F7F9FC] dark:bg-slate-950';
-  const card = 'bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800';
-  const title = 'text-slate-900 dark:text-slate-100';
-  const subText = 'text-slate-500 dark:text-slate-300';
-  const faintText = 'text-slate-400 dark:text-slate-400';
-  const btnOutline = 'px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 min-h-[40px]';
+  const pageWrap = 'flex flex-col min-h-full px-5 py-6 bg-hivio-bg dark:bg-hivio-bg-dark';
+  const card = 'bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark';
+  const title = 'text-hivio-text-primary dark:text-hivio-text-primary-dark';
+  const subText = 'text-hivio-text-secondary dark:text-hivio-text-secondary-dark';
+  const faintText = 'text-hivio-text-muted dark:text-hivio-text-muted-dark';
+  const btnOutline = 'px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-sm font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 min-h-[40px]';
 
   const inputBase =
-    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+    'w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 placeholder:text-hivio-text-muted dark:placeholder:text-hivio-text-muted-dark';
 
   function handleBasicChange(e) {
     const { name, value } = e.target;
@@ -279,82 +397,68 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   }
 
   function validateAccount() {
-    if (!normalizeText(form.email)) return 'Email is required.';
-    if (!EMAIL_REGEX.test(form.email.trim())) {
-      return 'Enter a valid email address.';
-    }
+    if (!normalizeText(form.firstName)) return 'First name is required.';
     return '';
   }
 
-  function persistUserAndUpdateState(updatedUser) {
-    saveUser(updatedUser);
-    if (typeof onUpdateUser === 'function') onUpdateUser(updatedUser);
+  async function persistUserAndUpdateState(updates) {
+    await saveUserProfile(user.uid, updates);
+    if (typeof onUpdateUser === 'function') onUpdateUser({ ...user, ...updates });
   }
 
-  function saveAccountDetails() {
+  async function saveAccountDetails() {
     setError('');
     setSuccess('');
 
     const v = validateAccount();
-    if (v) {
-      setError(v);
-      return;
-    }
+    if (v) { setError(v); return; }
 
-    const storedUser = getUser(user.email);
-    if (!storedUser) {
-      setError('No stored user found. Please log out and log back in.');
-      return;
-    }
-
-    const updatedUser = {
-      ...storedUser,
-      name: normalizeText(form.name),
-      email: form.email.trim().toLowerCase(),
+    const updates = {
+      name: `${normalizeText(form.firstName)} ${normalizeText(form.lastName)}`.trim(),
       avatarUrl: form.avatarUrl || null,
       profile: {
-        ...(storedUser.profile || {}),
+        ...(user.profile || {}),
         school: normalizeText(form.school),
         major: normalizeText(form.major),
         gradYear: String(form.gradYear),
-        interests: form.interests || []
-      }
+        interests: form.interests || [],
+      },
     };
 
+    setSaving(true);
     try {
-      persistUserAndUpdateState(updatedUser);
+      await persistUserAndUpdateState(updates);
       setSuccess('Account details updated.');
       setView('main');
     } catch {
       setError('Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
     }
   }
 
-  function saveDashboardPersonalization() {
+  async function saveDashboardPersonalization() {
     setError('');
     setSuccess('');
 
-    const storedUser = getUser(user.email);
-    if (!storedUser) {
-      setError('No stored user found. Please log out and log back in.');
-      return;
-    }
-
-    const updatedUser = {
-      ...storedUser,
+    const updates = {
+      weeklyGoalTarget: Math.max(1, Math.min(50, Number(form.weeklyGoalTarget) || 5)),
       dashboardWidgets: {
-        ...(storedUser.dashboardWidgets || {}),
-        ...(form.dashboardWidgets || {})
+        ...(user.dashboardWidgets || {}),
+        ...(form.dashboardWidgets || {}),
       },
       dashboardOrder: Array.isArray(form.dashboardOrder) ? [...form.dashboardOrder] : [...DEFAULT_DASHBOARD_ORDER],
     };
 
+    setSaving(true);
     try {
-      persistUserAndUpdateState(updatedUser);
+      await persistUserAndUpdateState(updates);
       setSuccess('Dashboard preferences saved.');
       setView('main');
     } catch {
       setError('Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -377,13 +481,13 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
             {success}
           </div>
         )}
@@ -400,7 +504,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
             }}
             aria-label="Change profile photo"
           >
-            <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 dark:text-slate-300 group-hover:bg-blue-50 dark:group-hover:bg-[#2C6E91]/10 group-hover:text-[#2C6E91] transition-all overflow-hidden">
+            <div className="w-24 h-24 bg-hivio-bg dark:bg-hivio-bg-dark rounded-full border-2 border-dashed border-[#C4CDD6] dark:border-hivio-border-dark flex items-center justify-center text-hivio-text-muted dark:text-hivio-text-muted-dark group-hover:bg-hivio-primary-ghost dark:group-hover:bg-hivio-primary/10 group-hover:text-hivio-primary transition-all overflow-hidden">
               {form.avatarUrl ? (
                 <img src={form.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -410,7 +514,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                 </svg>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 bg-[#2C6E91] text-white p-1.5 rounded-full border-2 border-white dark:border-slate-900">
+            <div className="absolute bottom-0 right-0 bg-hivio-primary text-hivio-text-inverse p-1.5 rounded-full border-2 border-white dark:border-hivio-surface-dark">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
                 <circle cx="12" cy="13" r="3" />
@@ -430,13 +534,15 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
             className="hidden"
           />
 
-          <button
-            type="button"
-            onClick={() => setForm((prev) => ({ ...prev, avatarUrl: '' }))}
-            className="mt-3 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-          >
-            Remove photo
-          </button>
+          {form.avatarUrl && (
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, avatarUrl: '' }))}
+              className="mt-3 px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
+            >
+              Remove photo
+            </button>
+          )}
         </div>
 
         {/* Basic */}
@@ -444,31 +550,29 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-3">Basic</p>
 
           <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                Full Name
-              </label>
-              <input
-                name="name"
-                value={form.name}
-                onChange={handleBasicChange}
-                className={inputBase}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                Email
-              </label>
-              <input
-                name="email"
-                value={form.email}
-                onChange={handleBasicChange}
-                className={inputBase}
-              />
-              <p className={`text-[11px] font-medium mt-1 ml-1 ${faintText}`}>
-                This is used for login in your local MVP.
-              </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">
+                  First Name <span className="text-hivio-text-muted dark:text-hivio-text-muted-dark">*</span>
+                </label>
+                <input
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleBasicChange}
+                  className={inputBase}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">
+                  Last Name
+                </label>
+                <input
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleBasicChange}
+                  className={inputBase}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -487,7 +591,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                 if (success) setSuccess('');
               }}
               options={MN_SCHOOLS}
-              placeholder="Start typing your school (Minnesota list)..."
+              placeholder="Start typing or use abbreviation (e.g. UMN, SCSU)..."
+              abbreviations={SCHOOL_ABBREVIATIONS}
             />
 
             <AutocompleteInput
@@ -499,11 +604,12 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                 if (success) setSuccess('');
               }}
               options={COMMON_MAJORS}
-              placeholder="Start typing your major..."
+              placeholder="Start typing or use abbreviation (e.g. MIS, CS)..."
+              abbreviations={MAJOR_ABBREVIATIONS}
             />
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">
                 Graduation Year
               </label>
               <select
@@ -545,8 +651,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                   onClick={() => toggleInterest(interest)}
                   className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
                     selected
-                      ? 'bg-[#2C6E91] text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      ? 'bg-hivio-primary text-hivio-text-inverse'
+                      : 'bg-hivio-bg dark:bg-hivio-bg-dark text-hivio-text-secondary dark:text-hivio-text-secondary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
                   }`}
                 >
                   {interest}
@@ -559,7 +665,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         <button
           type="button"
           onClick={saveAccountDetails}
-          className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors min-h-[44px]"
+          disabled={saving}
+          className="w-full bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3.5 rounded-md shadow-hivio-sm transition-colors duration-150 min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           Save Changes
         </button>
@@ -588,16 +695,38 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         </div>
 
         {error && (
-          <div className="mb-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
+          <div className="mb-4 bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
             {success}
           </div>
         )}
+
+        <div className={`${card} mb-4 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Weekly Application Goal</p>
+          <p className="text-xs text-slate-400 mb-3">
+            Used to score your activity in Pipeline Health.
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={form.weeklyGoalTarget}
+              onChange={(e) => setForm((prev) => ({ ...prev, weeklyGoalTarget: e.target.value }))}
+              onBlur={(e) => {
+                const n = Math.max(1, Math.min(50, Number(e.target.value) || 5));
+                setForm((prev) => ({ ...prev, weeklyGoalTarget: n }));
+              }}
+              className="w-20 bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150"
+            />
+            <span className="text-xs text-slate-400 font-medium">apps per week</span>
+          </div>
+        </div>
 
         <div className={`${card} mb-4 p-4`}>
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Dashboard Widgets</p>
@@ -613,22 +742,22 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                   key={widget.id}
                   type="button"
                   onClick={() => toggleWidget(widget.id)}
-                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-md border transition-all duration-150 text-left ${
                     enabled
-                      ? 'border-[#2C6E91] bg-blue-50/40 dark:bg-[#2C6E91]/10 ring-1 ring-[#2C6E91]/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600'
+                      ? 'border-hivio-border-focus bg-hivio-primary-light dark:bg-hivio-primary/10 ring-1 ring-hivio-border-focus/30'
+                      : 'border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
                   }`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      enabled ? 'bg-[#2C6E91] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-300'
+                      enabled ? 'bg-hivio-primary text-hivio-text-inverse' : 'bg-hivio-bg dark:bg-hivio-bg-dark text-hivio-text-muted dark:text-hivio-text-muted-dark'
                     }`}
                   >
                     {widget.icon}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${enabled ? 'text-[#2C6E91]' : 'text-slate-700 dark:text-slate-200'}`}>
+                    <div className={`text-sm font-medium ${enabled ? 'text-hivio-primary' : 'text-hivio-text-primary dark:text-hivio-text-primary-dark'}`}>
                       {widget.label}
                     </div>
                     <div className="text-xs text-slate-400 truncate">{widget.desc}</div>
@@ -636,7 +765,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
 
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      enabled ? 'border-[#2C6E91] bg-[#2C6E91]' : 'border-slate-300 dark:border-slate-600'
+                      enabled ? 'border-hivio-primary bg-hivio-primary' : 'border-[#C4CDD6] dark:border-hivio-border-dark'
                     }`}
                   >
                     {enabled && (
@@ -672,14 +801,14 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                   onDragOver={(e) => handleDragOver(e, idx)}
                   onDrop={() => handleDrop(idx)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-grab active:cursor-grabbing transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-md border cursor-grab active:cursor-grabbing transition-all duration-150 ${
                     isDragging
-                      ? 'opacity-40 border-dashed border-slate-300 dark:border-slate-600'
+                      ? 'opacity-40 border-dashed border-[#C4CDD6] dark:border-hivio-border-dark'
                       : isOver
-                      ? 'border-[#2C6E91] bg-blue-50/40 dark:bg-[#2C6E91]/10 shadow-sm'
+                      ? 'border-hivio-border-focus bg-hivio-primary-light dark:bg-hivio-primary/10 shadow-hivio-sm'
                       : isEnabled
-                      ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
-                      : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-50'
+                      ? 'border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark'
+                      : 'border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark opacity-50'
                   }`}
                 >
                   <svg
@@ -692,7 +821,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
                     <line x1="8" y1="18" x2="16" y2="18" />
                   </svg>
                   <span className="text-[10px] font-bold text-slate-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
-                  <span className={`flex-1 text-sm font-semibold ${isEnabled ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                  <span className={`flex-1 text-sm font-medium ${isEnabled ? 'text-hivio-text-primary dark:text-hivio-text-primary-dark' : 'text-hivio-text-muted dark:text-hivio-text-muted-dark'}`}>
                     {meta.label}
                   </span>
                   {!isEnabled && (
@@ -708,7 +837,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           <button
             type="button"
             onClick={resetWidgetsToDefaults}
-            className="flex-1 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
+            className="flex-1 border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark font-medium py-3.5 rounded-md hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 min-h-[44px]"
           >
             Reset defaults
           </button>
@@ -716,7 +845,8 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           <button
             type="button"
             onClick={saveDashboardPersonalization}
-            className="flex-1 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors min-h-[44px]"
+            disabled={saving}
+            className="flex-1 bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3.5 rounded-md shadow-hivio-sm transition-colors duration-150 min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Save Dashboard
           </button>
@@ -732,49 +862,53 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
   // =========================
   return (
     <div className={pageWrap}>
-      <h1 className={`text-2xl font-bold tracking-tight ${title} mb-6`}>
-        Settings
-      </h1>
 
-      <div className={`${card} flex items-center gap-4 mb-6 p-4`}>
+      {error && (
+        <div className="mb-4 bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
+          {success}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setView('account')}
+        className={`${card} w-full flex items-center gap-4 mb-6 p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 text-left`}
+      >
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt="Avatar"
-            className="w-14 h-14 rounded-full object-cover border-2 border-white dark:border-slate-900 shadow-sm"
+            className="w-14 h-14 rounded-full object-cover border-2 border-hivio-surface dark:border-hivio-surface-dark shadow-sm flex-shrink-0"
           />
         ) : (
-          <div className="w-14 h-14 rounded-full bg-[#2C6E91] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          <div className="w-14 h-14 rounded-full bg-hivio-primary flex items-center justify-center text-hivio-text-inverse font-bold text-lg shadow-sm flex-shrink-0">
             {user.name?.charAt(0).toUpperCase()}
           </div>
         )}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h2 className={`text-base font-bold ${title}`}>{user.name}</h2>
           <p className={`text-sm ${subText}`}>{user.email}</p>
-          {user.profile && (
+          {user.profile && (user.profile.school || user.profile.gradYear) && (
             <p className={`text-xs mt-0.5 ${faintText}`}>
-              {user.profile.school} · {user.profile.gradYear}
+              {[user.profile.school, user.profile.gradYear].filter(Boolean).join(' · ')}
             </p>
           )}
         </div>
-      </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500 flex-shrink-0">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800 mb-6">
-        <button
-          type="button"
-          onClick={() => setView('account')}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-t-2xl min-h-[44px]"
-        >
-          <span className="font-semibold text-slate-700 dark:text-slate-200">Account Details</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-
+      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark divide-y divide-hivio-border dark:divide-hivio-border-dark mb-6">
         <button
           type="button"
           onClick={() => setView('dashboard')}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 rounded-t-lg min-h-[44px]"
         >
           <span className="font-semibold text-slate-700 dark:text-slate-200">Dashboard</span>
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-500">
@@ -787,7 +921,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
           <button
             type="button"
             onClick={() => typeof onTabChange === 'function' && onTabChange('dev')}
-            className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800 min-h-[44px]"
+            className="w-full flex items-center justify-between p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 border-t border-[#C4CDD6] dark:border-hivio-border-dark min-h-[44px]"
           >
             <span className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200">
               Developer Console
@@ -805,7 +939,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         <button
           type="button"
           onClick={toggleTheme}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800 min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 border-t border-[#C4CDD6] dark:border-hivio-border-dark min-h-[44px]"
         >
           <span className="font-semibold text-slate-700 dark:text-slate-200">Appearance</span>
           <div className="flex items-center gap-2">
@@ -815,15 +949,15 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
             <div
               className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 border ${
                 theme === 'dark'
-                  ? 'bg-[#2C6E91]/20 border-[#2C6E91]/30'
-                  : 'bg-slate-100 border-slate-200'
+                  ? 'bg-hivio-primary/20 border-hivio-primary/30'
+                  : 'bg-hivio-bg border-hivio-border'
               }`}
               aria-hidden="true"
             >
               <div
                 className={`w-5 h-5 rounded-full transition-transform ${
                   theme === 'dark'
-                    ? 'bg-[#2C6E91] translate-x-5'
+                    ? 'bg-hivio-primary translate-x-5'
                     : 'bg-white translate-x-0'
                 }`}
               />
@@ -834,7 +968,7 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
         <button
           type="button"
           onClick={() => onToggleNotifications?.(!notificationsEnabled)}
-          className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-b-2xl min-h-[44px]"
+          className="w-full flex items-center justify-between p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 rounded-b-lg min-h-[44px]"
         >
           <span className="font-semibold text-slate-700 dark:text-slate-200">Notifications</span>
           <div className="flex items-center gap-2">
@@ -843,13 +977,13 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
             </span>
             <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 border ${
               notificationsEnabled
-                ? 'bg-[#2C6E91]/20 border-[#2C6E91]/30'
-                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                ? 'bg-hivio-primary/20 border-hivio-primary/30'
+                : 'bg-hivio-bg dark:bg-hivio-bg-dark border-[#C4CDD6] dark:border-hivio-border-dark'
             }`}>
               <div className={`w-5 h-5 rounded-full transition-transform ${
                 notificationsEnabled
-                  ? 'bg-[#2C6E91] translate-x-5'
-                  : 'bg-white dark:bg-slate-500 translate-x-0'
+                  ? 'bg-hivio-primary translate-x-5'
+                  : 'bg-white dark:bg-hivio-text-muted-dark translate-x-0'
               }`} />
             </div>
           </div>
@@ -858,39 +992,54 @@ function Settings({ user, onLogout, onUpdateUser, notificationsEnabled, onToggle
 
       <FeedbackCard user={user} />
 
-      {/* Changelog */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">What's New</p>
-          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#2C6E91]/10 text-[#2C6E91] border border-[#2C6E91]/20">
-            v0.1.1
-          </span>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Account creation showed a blank screen</p>
+      {/* Data & Export */}
+      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark p-4 mb-6">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Data &amp; Export</p>
+        <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark mb-4">Download your application data</p>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={exportCSV}
+            disabled={apps.filter((a) => !a.archived).length === 0}
+            className="w-full flex items-center gap-3 p-3.5 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed text-left"
+          >
+            <div className="w-8 h-8 rounded-md bg-hivio-primary-light dark:bg-hivio-primary/15 flex items-center justify-center flex-shrink-0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
-              Creating a new account would result in a blank screen instead of loading the dashboard. The onboarding flow now completes correctly.
-            </p>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-500/20">Fix</span>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Pipeline Health missing from widget order</p>
+            <div>
+              <p className="text-sm font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark">Export CSV</p>
+              <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark">{apps.filter((a) => !a.archived).length} applications</p>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed ml-0.5">
-              Pipeline Health did not appear in the dashboard widget reorder list for existing accounts. All widgets now always show.
-            </p>
-          </div>
+          </button>
+          <button
+            type="button"
+            onClick={exportPDF}
+            disabled={apps.filter((a) => !a.archived).length === 0}
+            className="w-full flex items-center gap-3 p-3.5 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed text-left"
+          >
+            <div className="w-8 h-8 rounded-md bg-hivio-primary-light dark:bg-hivio-primary/15 flex items-center justify-center flex-shrink-0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark">Export PDF Report</p>
+              <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark">Full dashboard summary</p>
+            </div>
+          </button>
         </div>
+        {exportFeedback.msg && (
+          <p className={`text-xs font-medium mt-3 ${exportFeedback.ok ? 'text-hivio-status-interview' : 'text-hivio-status-rejected'}`}>
+            {exportFeedback.msg}
+          </p>
+        )}
       </div>
 
       <button
         onClick={onLogout}
-        className="w-full bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 text-red-600 dark:text-red-300 font-semibold py-3.5 rounded-xl transition-colors min-h-[44px] border border-red-100 dark:border-red-900/40"
+        className="w-full bg-hivio-status-rejected-bg hover:bg-hivio-status-rejected/10 text-hivio-status-rejected font-medium py-3.5 rounded-md transition-colors duration-150 min-h-[44px] border border-hivio-status-rejected/20 dark:bg-[#3d2020] dark:hover:bg-[#4a2525] dark:text-[#e87c7c] dark:border-[#5a2a2a]"
       >
         Sign Out
       </button>

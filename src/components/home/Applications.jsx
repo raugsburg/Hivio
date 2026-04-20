@@ -1,27 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { getApplicationsIntentKey, safeReadJSON } from '../../utils/storage';
+import {
+  subscribeApplications, saveApplication, deleteApplication,
+  subscribeResumes, saveResume,
+} from '../../utils/db';
 import { isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 import { MN_LOCATIONS } from '../../data/mn-locations';
 
 function scrollAppContainerToTop() {
   const el = document.getElementById('app-scroll-container');
   if (el) el.scrollTo({ top: 0, behavior: 'auto' });
-}
-
-function readApps(storageKey) {
-  return safeReadJSON(storageKey, []);
-}
-
-function writeApps(storageKey, apps) {
-  return safeWriteJSON(storageKey, apps);
-}
-
-function readResumes(storageKey) {
-  return safeReadJSON(storageKey, []);
-}
-
-function writeResumes(storageKey, resumes) {
-  safeWriteJSON(storageKey, resumes);
 }
 
 /* Constants */
@@ -88,14 +76,13 @@ function LocationField({ value, onChange, inputClassName }) {
 
   const suggestions = useMemo(() => {
     const q = (query || '').trim().toLowerCase();
-    if (!q) return LOCATION_OPTIONS.slice(0, 8);
+    if (!q) return LOCATION_OPTIONS;
     const starts = [];
     const contains = [];
     for (const opt of LOCATION_OPTIONS) {
       const t = opt.toLowerCase();
       if (t.startsWith(q)) starts.push(opt);
       else if (t.includes(q)) contains.push(opt);
-      if (starts.length + contains.length >= 8) break;
     }
     return [...starts, ...contains];
   }, [query]);
@@ -110,17 +97,87 @@ function LocationField({ value, onChange, inputClassName }) {
         className={inputClassName}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+        <div className="absolute z-30 mt-1 w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg shadow-hivio-md overflow-y-auto scrollbar-hide" style={{ maxHeight: '180px' }}>
           {suggestions.map((opt) => (
             <button
               key={opt}
               type="button"
               onMouseDown={(e) => { e.preventDefault(); onChange(opt); setQuery(opt); setOpen(false); }}
-              className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm"
+              className="w-full text-left px-4 py-2.5 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 text-hivio-text-primary dark:text-hivio-text-primary-dark text-sm"
             >
               {opt}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResumeSelectField({ value, onChange, resumes, inputClassName }) {
+  const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!containerRef.current?.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  function handleToggle() {
+    if (!open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 200);
+    }
+    setOpen((p) => !p);
+  }
+
+  const selected = resumes.find((r) => r.id === value);
+  const displayLabel = selected ? (selected.label || selected.fileName) : 'None';
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={handleToggle}
+        className={`${inputClassName} flex items-center justify-between text-left h-12 text-sm`}
+      >
+        <span className={`truncate flex-1 min-w-0 ${!selected ? 'text-hivio-text-muted dark:text-hivio-text-muted-dark' : ''}`}>
+          {displayLabel}
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 ml-2 text-hivio-text-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className={`absolute z-30 w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg shadow-hivio-lg overflow-y-auto scrollbar-hide ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`} style={{ maxHeight: '200px' }}>
+          <div>
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange(''); setOpen(false); }}
+              className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 ${!value ? 'text-hivio-primary font-medium bg-hivio-primary-light dark:bg-hivio-primary/10' : 'text-hivio-text-muted dark:text-hivio-text-muted-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'}`}
+            >
+              None
+            </button>
+            {resumes.length === 0 && (
+              <p className="px-4 py-2.5 text-sm text-hivio-text-muted dark:text-hivio-text-muted-dark">No resumes uploaded yet.</p>
+            )}
+            {resumes.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onChange(r.id); setOpen(false); }}
+                className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 ${value === r.id ? 'text-hivio-primary font-medium bg-hivio-primary-light dark:bg-hivio-primary/10' : 'text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'}`}
+              >
+                {r.label || r.fileName}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -140,18 +197,17 @@ function emptyForm() {
   };
 }
 
-function Applications({ user }) {
-  const appsStorageKey = useMemo(() => getApplicationsStorageKey(user), [user]);
-  const resumesStorageKey = useMemo(() => getResumesStorageKey(user), [user]);
-  const intentKey = useMemo(() => getApplicationsIntentKey(user), [user]);
+function Applications({ user, openAppId, onOpenAppIdConsumed }) {
+  const intentKey = useMemo(() => getApplicationsIntentKey(user?.uid), [user]);
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [view, setView] = useState('list'); // 'list' | 'add' | 'edit'
   const [addForm, setAddForm] = useState(emptyForm());
 
   const [editingApp, setEditingApp] = useState(null);
@@ -162,6 +218,12 @@ function Applications({ user }) {
 
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [resumeFilter, setResumeFilter] = useState(null);
+  const [showResumeMenu, setShowResumeMenu] = useState(false);
+  const resumeMenuRef = useRef(null);
+  const [sortOrder, setSortOrder] = useState('newest');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef(null);
 
   const [showAddResumeUpload, setShowAddResumeUpload] = useState(false);
   const [showEditResumeUpload, setShowEditResumeUpload] = useState(false);
@@ -174,13 +236,13 @@ function Applications({ user }) {
   const [editResumeFile, setEditResumeFile] = useState(null);
   const [editResumeLabel, setEditResumeLabel] = useState('');
 
+  // Firestore real-time subscriptions
   useEffect(() => {
-    setApps(readApps(appsStorageKey));
-  }, [appsStorageKey]);
-
-  useEffect(() => {
-    setResumes(readResumes(resumesStorageKey));
-  }, [resumesStorageKey]);
+    if (!user?.uid) return;
+    const unsubApps = subscribeApplications(user.uid, setApps);
+    const unsubResumes = subscribeResumes(user.uid, setResumes);
+    return () => { unsubApps(); unsubResumes(); };
+  }, [user?.uid]);
 
   useEffect(() => {
     try {
@@ -202,26 +264,64 @@ function Applications({ user }) {
     }
   }, [intentKey]);
 
+
   useEffect(() => {
-    const modalOpen = showAdd || Boolean(editingApp);
-    if (!modalOpen) return;
+    if (!openAppId || apps.length === 0) return;
+    const app = apps.find((a) => a.id === openAppId);
+    if (app) openEdit(app);
+    if (typeof onOpenAppIdConsumed === 'function') onOpenAppIdConsumed();
+  }, [openAppId, apps]);
 
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [showAdd, editingApp]);
+  useEffect(() => {
+    if (!openMenuId) return;
+    function onDocClick() { setOpenMenuId(null); }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [openMenuId]);
 
-  function persistApps(next) {
-    setApps(next);
-    const ok = writeApps(appsStorageKey, next);
-    if (!ok) setError('Save failed — storage may be full. Try removing large resume files.');
+  useEffect(() => {
+    if (!showResumeMenu) return;
+    function onDocClick(e) {
+      if (!resumeMenuRef.current?.contains(e.target)) setShowResumeMenu(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showResumeMenu]);
+
+  useEffect(() => {
+    if (!showSortMenu) return;
+    function onDocClick(e) {
+      if (!sortMenuRef.current?.contains(e.target)) setShowSortMenu(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showSortMenu]);
+
+
+  async function persistApp(app) {
+    try {
+      await saveApplication(user.uid, app);
+      return true;
+    } catch {
+      setError('Save failed. Please try again.');
+      return false;
+    }
   }
 
-  function persistResumes(next) {
-    setResumes(next);
-    writeResumes(resumesStorageKey, next);
+  async function removeApp(appId) {
+    try {
+      await deleteApplication(user.uid, appId);
+    } catch {
+      setError('Delete failed. Please try again.');
+    }
+  }
+
+  async function persistResume(resume) {
+    try {
+      await saveResume(user.uid, resume);
+    } catch {
+      setError('Resume save failed. Please try again.');
+    }
   }
 
   function validate(form) {
@@ -241,15 +341,6 @@ function Applications({ user }) {
       return 'File is too large. Please upload a file under 5MB.';
     }
     return '';
-  }
-
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   }
 
   function resumeLabelById(resumeId) {
@@ -300,18 +391,17 @@ function Applications({ user }) {
     setSuccess('');
     setError('');
     setAddForm(emptyForm());
-
     setShowAddResumeUpload(false);
     setAddResumeFile(null);
     setAddResumeLabel('');
     if (addResumeInputRef.current) addResumeInputRef.current.value = '';
-
-    setShowAdd(true);
+    setView('add');
   }
 
   function closeAdd() {
-    setShowAdd(false);
+    setView('list');
     setError('');
+    scrollAppContainerToTop();
   }
 
   function openEdit(app) {
@@ -319,7 +409,6 @@ function Applications({ user }) {
     setSuccess('');
     setError('');
     setOpenMenuId(null);
-
     setEditingApp(app);
     setEditForm({
       company: app.company || '',
@@ -331,16 +420,18 @@ function Applications({ user }) {
       notes: app.notes || '',
       resumeId: app.resumeId || '',
     });
-
     setShowEditResumeUpload(false);
     setEditResumeFile(null);
     setEditResumeLabel('');
     if (editResumeInputRef.current) editResumeInputRef.current.value = '';
+    setView('edit');
   }
 
   function closeEdit() {
+    setView('list');
     setEditingApp(null);
     setError('');
+    scrollAppContainerToTop();
   }
 
   function handleAddChange(e) {
@@ -353,7 +444,7 @@ function Applications({ user }) {
     setEditForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function saveNewApp() {
+  async function saveNewApp() {
     setError('');
     setSuccess('');
 
@@ -378,12 +469,20 @@ function Applications({ user }) {
       updatedAt: new Date().toISOString(),
     };
 
-    persistApps([newApp, ...apps]);
-    setShowAdd(false);
-    setSuccess('Application added.');
+    setSaving(true);
+    try {
+      const ok = await persistApp(newApp);
+      if (!ok) return;
+      setView('list');
+      scrollAppContainerToTop();
+      setSuccess('Application added.');
+      setTimeout(() => setSuccess(''), 3000);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function saveEditsAndClose() {
+  async function saveEditsAndClose() {
     if (!editingApp) return;
 
     setError('');
@@ -395,41 +494,49 @@ function Applications({ user }) {
       return;
     }
 
-    const next = apps.map((a) =>
-      a.id === editingApp.id
-        ? {
-            ...a,
-            company: editForm.company.trim(),
-            title: editForm.title.trim(),
-            date: editForm.date,
-            status: editForm.status,
-            followUpDate: editForm.followUpDate,
-            location: editForm.location.trim(),
-            notes: editForm.notes.trim(),
-            resumeId: editForm.resumeId,
-            updatedAt: new Date().toISOString(),
-          }
-        : a
-    );
+    const updated = {
+      ...editingApp,
+      company: editForm.company.trim(),
+      title: editForm.title.trim(),
+      date: editForm.date,
+      status: editForm.status,
+      followUpDate: editForm.followUpDate,
+      location: editForm.location.trim(),
+      notes: editForm.notes.trim(),
+      resumeId: editForm.resumeId,
+      updatedAt: new Date().toISOString(),
+    };
 
-    persistApps(next);
-    setEditingApp(null);
-    setSuccess('Application updated.');
+    setSaving(true);
+    try {
+      const ok = await persistApp(updated);
+      if (!ok) return;
+      setView('list');
+      setEditingApp(null);
+      scrollAppContainerToTop();
+      setSuccess('Application updated.');
+      setTimeout(() => setSuccess(''), 3000);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleDelete(appId) {
-    persistApps(apps.filter((a) => a.id !== appId));
+  async function handleDelete(appId) {
+    await removeApp(appId);
     setOpenMenuId(null);
   }
 
-  function handleArchive(appId) {
-    persistApps(apps.map((a) => (a.id === appId ? { ...a, archived: true } : a)));
+  async function handleArchive(appId) {
+    const app = apps.find((a) => a.id === appId);
+    if (app) await persistApp({ ...app, archived: true });
     setOpenMenuId(null);
   }
 
-  function handleUnarchive(appId) {
-    persistApps(apps.map((a) => (a.id === appId ? { ...a, archived: false } : a)));
+  async function handleUnarchive(appId) {
+    const app = apps.find((a) => a.id === appId);
+    if (app) await persistApp({ ...app, archived: false });
   }
+
 
   function handleAddResumeFilePick() {
     setError('');
@@ -469,7 +576,6 @@ function Applications({ user }) {
     }
 
     try {
-      const dataUrl = await fileToDataUrl(addResumeFile);
       const newResume = {
         id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
         fileName: addResumeFile.name,
@@ -477,10 +583,9 @@ function Applications({ user }) {
         fileSize: addResumeFile.size,
         label: addResumeLabel.trim(),
         uploadedAt: new Date().toISOString(),
-        dataUrl,
       };
 
-      persistResumes([newResume, ...resumes]);
+      await persistResume(newResume);
       setAddForm((prev) => ({ ...prev, resumeId: newResume.id }));
 
       setAddResumeFile(null);
@@ -488,9 +593,9 @@ function Applications({ user }) {
       if (addResumeInputRef.current) addResumeInputRef.current.value = '';
 
       setShowAddResumeUpload(false);
-      setSuccess('Resume uploaded and linked.');
+      setSuccess('Resume linked.');
     } catch {
-      setError('Resume upload failed. Please try again.');
+      setError('Resume save failed. Please try again.');
     }
   }
 
@@ -532,7 +637,6 @@ function Applications({ user }) {
     }
 
     try {
-      const dataUrl = await fileToDataUrl(editResumeFile);
       const newResume = {
         id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
         fileName: editResumeFile.name,
@@ -540,10 +644,9 @@ function Applications({ user }) {
         fileSize: editResumeFile.size,
         label: editResumeLabel.trim(),
         uploadedAt: new Date().toISOString(),
-        dataUrl,
       };
 
-      persistResumes([newResume, ...resumes]);
+      await persistResume(newResume);
       setEditForm((prev) => ({ ...prev, resumeId: newResume.id }));
 
       setEditResumeFile(null);
@@ -551,9 +654,9 @@ function Applications({ user }) {
       if (editResumeInputRef.current) editResumeInputRef.current.value = '';
 
       setShowEditResumeUpload(false);
-      setSuccess('Resume uploaded and linked.');
+      setSuccess('Resume linked.');
     } catch {
-      setError('Resume upload failed. Please try again.');
+      setError('Resume save failed. Please try again.');
     }
   }
 
@@ -561,6 +664,10 @@ function Applications({ user }) {
 
   const activeAppsFiltered = useMemo(() => {
     let list = activeAppsAll;
+
+    if (resumeFilter) {
+      list = list.filter((a) => a.resumeId === resumeFilter);
+    }
 
     if (activeFilter === 'followups') {
       list = [...list]
@@ -580,49 +687,279 @@ function Applications({ user }) {
       );
     }
 
+    if (activeFilter !== 'followups') {
+      list = [...list].sort((a, b) => {
+        if (sortOrder === 'az') return (a.company || '').localeCompare(b.company || '');
+        if (sortOrder === 'oldest') return (a.date || '').localeCompare(b.date || '');
+        return (b.date || '').localeCompare(a.date || '');
+      });
+    }
+
     return list;
-  }, [activeAppsAll, activeFilter, searchQuery]);
+  }, [activeAppsAll, activeFilter, searchQuery, resumeFilter, sortOrder]);
 
   const archivedApps = useMemo(() => apps.filter((a) => a.archived), [apps]);
 
 
-  const pageBg = 'bg-[#F7F9FC] dark:bg-slate-950';
-  const cardBg = 'bg-white dark:bg-slate-900';
-  const border = 'border border-slate-300 dark:border-slate-800';
-  const textMain = 'text-slate-900 dark:text-slate-100';
-  const textSub = 'text-slate-500 dark:text-slate-300';
+  const pageBg = 'bg-hivio-bg dark:bg-hivio-bg-dark';
+  const cardBg = 'bg-hivio-surface dark:bg-hivio-surface-dark';
+  const border = 'border border-[#C4CDD6] dark:border-hivio-border-dark';
+  const textMain = 'text-hivio-text-primary dark:text-hivio-text-primary-dark';
+  const textSub = 'text-hivio-text-secondary dark:text-hivio-text-secondary-dark';
 
   const inputBase =
-    'w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all';
+    'w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 placeholder:text-hivio-text-muted dark:placeholder:text-hivio-text-muted-dark';
+
+  const backBtn = 'w-10 h-10 flex items-center justify-center rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-secondary dark:text-hivio-text-secondary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors flex-shrink-0 absolute left-0';
+
+  // ─── ADD PAGE ──────────────────────────────────────────────────────────────
+  if (view === 'add') {
+    return (
+      <div className={`flex flex-col min-h-full px-5 pt-4 pb-8 ${pageBg}`}>
+        <div className="relative flex items-center justify-center h-10 mb-5">
+          <button type="button" onClick={closeAdd} className={backBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          <h1 className={`text-base font-bold ${textMain}`}>New Application</h1>
+        </div>
+
+        {error && (
+          <div className="mb-4 bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Company *</label>
+            <input name="company" value={addForm.company} onChange={handleAddChange} className={inputBase} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Job Title *</label>
+            <input name="title" value={addForm.title} onChange={handleAddChange} className={inputBase} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Date *</label>
+              <input type="date" name="date" value={addForm.date} onChange={handleAddChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Status *</label>
+              <select name="status" value={addForm.status} onChange={handleAddChange} className={`${inputBase} select-field`}>
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Follow-Up</label>
+              <input type="date" name="followUpDate" value={addForm.followUpDate} onChange={handleAddChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Location</label>
+              <LocationField value={addForm.location} onChange={(v) => setAddForm((p) => ({ ...p, location: v }))} inputClassName={inputBase} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Resume Used</label>
+              <button type="button" onClick={() => setShowAddResumeUpload((p) => !p)} className="px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150">
+                {showAddResumeUpload ? 'Hide upload' : 'Upload new'}
+              </button>
+            </div>
+            <ResumeSelectField
+              value={addForm.resumeId}
+              onChange={(v) => setAddForm((p) => ({ ...p, resumeId: v }))}
+              resumes={resumes}
+              inputClassName={inputBase}
+            />
+            {showAddResumeUpload && (
+              <div className="mt-2 border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark rounded-lg p-3">
+                <button type="button" onClick={handleAddResumeFilePick} className="px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-sm font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150">
+                  Choose File
+                </button>
+                <input ref={addResumeInputRef} type="file" className="hidden" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleAddResumeFileChange} />
+                {addResumeFile && (
+                  <div className="mt-2">
+                    <p className="text-xs text-hivio-text-secondary dark:text-hivio-text-secondary-dark font-medium truncate">Selected: {addResumeFile.name}</p>
+                    <label className="text-xs font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mt-2 mb-1 block">Label</label>
+                    <input value={addResumeLabel} onChange={(e) => setAddResumeLabel(e.target.value)} className={inputBase} />
+                    <button type="button" onClick={handleAddResumeUpload} className="w-full mt-2 bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3 rounded-md shadow-hivio-sm transition-colors duration-150">Upload & Link</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Notes</label>
+            <textarea name="notes" value={addForm.notes} onChange={handleAddChange} rows={2} className={`${inputBase} resize-none`} />
+          </div>
+          <button type="button" onClick={saveNewApp} disabled={saving} className="w-full bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3.5 rounded-md shadow-hivio-sm transition-colors duration-150 mt-1 disabled:opacity-60 disabled:cursor-not-allowed">
+            Save Application
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── EDIT PAGE ─────────────────────────────────────────────────────────────
+  if (view === 'edit') {
+    return (
+      <div className={`flex flex-col min-h-full px-5 pt-4 pb-8 ${pageBg}`}>
+        <div className="relative flex items-center justify-center h-10 mb-5">
+          <button type="button" onClick={closeEdit} className={backBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          <h1 className={`text-base font-bold ${textMain}`}>Edit Application</h1>
+        </div>
+
+        {error && (
+          <div className="mb-4 bg-hivio-status-rejected-bg dark:bg-hivio-status-rejected-bg-dark border border-hivio-status-rejected/20 dark:border-hivio-status-rejected-dark/20 text-hivio-status-rejected dark:text-hivio-status-rejected-dark text-sm font-medium px-4 py-3 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Company *</label>
+            <input name="company" value={editForm.company} onChange={handleEditChange} className={inputBase} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Job Title *</label>
+            <input name="title" value={editForm.title} onChange={handleEditChange} className={inputBase} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Date *</label>
+              <input type="date" name="date" value={editForm.date} onChange={handleEditChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Status *</label>
+              <select name="status" value={editForm.status} onChange={handleEditChange} className={`${inputBase} select-field`}>
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Follow-Up</label>
+              <input type="date" name="followUpDate" value={editForm.followUpDate} onChange={handleEditChange} className={inputBase} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Location</label>
+              <LocationField value={editForm.location} onChange={(v) => setEditForm((p) => ({ ...p, location: v }))} inputClassName={inputBase} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Resume Used</label>
+              <button type="button" onClick={() => setShowEditResumeUpload((p) => !p)} className="px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150">
+                {showEditResumeUpload ? 'Hide upload' : 'Upload new'}
+              </button>
+            </div>
+            <ResumeSelectField
+              value={editForm.resumeId}
+              onChange={(v) => setEditForm((p) => ({ ...p, resumeId: v }))}
+              resumes={resumes}
+              inputClassName={inputBase}
+            />
+            {editForm.resumeId && (
+              <p className="text-xs text-hivio-text-secondary dark:text-hivio-text-secondary-dark font-medium mt-1 ml-1">Currently linked: {resumeLabelById(editForm.resumeId)}</p>
+            )}
+            {showEditResumeUpload && (
+              <div className="mt-2 border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark rounded-lg p-3">
+                <button type="button" onClick={handleEditResumeFilePick} className="px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-sm font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150">
+                  Choose File
+                </button>
+                <input ref={editResumeInputRef} type="file" className="hidden" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleEditResumeFileChange} />
+                {editResumeFile && (
+                  <div className="mt-2">
+                    <p className="text-xs text-hivio-text-secondary dark:text-hivio-text-secondary-dark font-medium truncate">Selected: {editResumeFile.name}</p>
+                    <label className="text-xs font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mt-2 mb-1 block">Label</label>
+                    <input value={editResumeLabel} onChange={(e) => setEditResumeLabel(e.target.value)} className={inputBase} />
+                    <button type="button" onClick={handleEditResumeUpload} className="w-full mt-2 bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3 rounded-md shadow-hivio-sm transition-colors duration-150">Upload & Link</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1 block">Notes</label>
+            <textarea name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} className={`${inputBase} resize-none`} />
+          </div>
+          <button type="button" onClick={saveEditsAndClose} disabled={saving} className="w-full bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse font-medium py-3.5 rounded-md shadow-hivio-sm transition-colors duration-150 mt-1 disabled:opacity-60 disabled:cursor-not-allowed">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`relative flex flex-col min-h-full px-5 py-6 ${pageBg}`}>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className={`text-2xl font-bold tracking-tight ${textMain}`}>
-          Applications
-        </h1>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold px-4 py-2.5 rounded-xl shadow-md transition-colors min-h-[40px] whitespace-nowrap"
-        >
-          + Add
-        </button>
+    <div className={`relative flex flex-col min-h-full px-5 pt-5 pb-4 ${pageBg}`}>
+
+      {/* Search bar — top */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="Company, role, or location…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 placeholder:text-hivio-text-muted shadow-hivio-sm"
+          />
+        </div>
+        {/* Sort button */}
+        <div className="relative flex-shrink-0" ref={sortMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowSortMenu((p) => !p)}
+            className={`flex items-center gap-1 px-3 py-2.5 rounded-md border text-xs font-medium transition-colors duration-150 ${
+              sortOrder !== 'newest'
+                ? 'bg-hivio-primary-light border-hivio-border-focus text-hivio-primary'
+                : 'border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-secondary dark:text-hivio-text-secondary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
+            }`}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/>
+            </svg>
+            {{ newest: 'Newest', oldest: 'Oldest', az: 'A–Z' }[sortOrder]}
+            {sortOrder !== 'newest' && (
+              <span
+                role="button"
+                aria-label="Clear sort"
+                className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-hivio-primary/15 text-hivio-primary hover:bg-hivio-primary/25 transition-colors duration-150 text-[11px] font-bold leading-none ml-0.5"
+                onMouseDown={(e) => { e.stopPropagation(); setSortOrder('newest'); setShowSortMenu(false); }}
+              >×</span>
+            )}
+          </button>
+          {showSortMenu && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg shadow-hivio-md overflow-hidden w-28">
+              {[{ id: 'newest', label: 'Newest' }, { id: 'oldest', label: 'Oldest' }, { id: 'az', label: 'A–Z' }].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onMouseDown={() => { setSortOrder(opt.id); setShowSortMenu(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors duration-150 ${
+                    sortOrder === opt.id ? 'text-hivio-primary bg-hivio-primary-light dark:bg-hivio-primary/10' : 'text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="relative mb-4">
-        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          type="text"
-          placeholder="Search by company, role, or location…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2C6E91]/30 focus:border-[#2C6E91] transition-all placeholder:text-slate-400 shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-        />
-      </div>
-
+      {/* Status filter chips */}
       <div className="mb-4 -mx-5 px-5">
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {FILTER_CHIPS.map((chip) => {
@@ -632,10 +969,10 @@ function Applications({ user }) {
                 key={chip.id}
                 type="button"
                 onClick={() => setActiveFilter(chip.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-medium transition-colors duration-150 ${
                   selected
-                    ? 'bg-[#2C6E91] text-white shadow-[0_4px_12px_rgba(44,110,145,0.25)]'
-                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#2C6E91]/40'
+                    ? 'bg-hivio-primary text-hivio-text-inverse shadow-hivio-sm'
+                    : 'bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-secondary dark:text-hivio-text-secondary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
                 }`}
               >
                 {chip.label}
@@ -645,48 +982,108 @@ function Applications({ user }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 mb-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-2 mb-4">
         <button
           type="button"
-          onClick={() => setShowArchived((p) => !p)}
-          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          onClick={() => { setShowArchived((p) => !p); }}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition-colors duration-150 ${
+            showArchived
+              ? 'bg-hivio-primary-light border-hivio-border-focus text-hivio-primary'
+              : 'border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
+          }`}
         >
-          {showArchived ? 'Hide Archived' : 'Show Archived'}
-          {archivedApps.length ? ` (${archivedApps.length})` : ''}
+          {showArchived ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              Active
+            </>
+          ) : (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              Archived{archivedApps.length > 0 && <span className="ml-1 bg-hivio-primary text-hivio-text-inverse rounded-full px-1.5 py-0.5 text-[10px] font-bold">{archivedApps.length}</span>}
+            </>
+          )}
         </button>
 
-        <button
-          type="button"
-          onClick={exportToCSV}
-          disabled={apps.filter((a) => !a.archived).length === 0}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Export CSV
-        </button>
+        {/* Resume filter dropdown */}
+        <div className="relative" ref={resumeMenuRef}>
+          <button
+            type="button"
+            onClick={() => resumes.length > 0 && setShowResumeMenu((p) => !p)}
+            disabled={resumes.length === 0}
+            title={resumeFilter ? resumeLabelById(resumeFilter) : undefined}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition-colors duration-150 min-w-[90px] max-w-[140px] overflow-hidden ${
+              resumes.length === 0
+                ? 'border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-muted dark:text-hivio-text-muted-dark opacity-50 cursor-not-allowed'
+                : resumeFilter
+                ? 'bg-hivio-primary-light border-hivio-border-focus text-hivio-primary'
+                : 'border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
+            }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span className="truncate min-w-0">{resumeFilter ? resumeLabelById(resumeFilter) : 'Resume'}</span>
+            {resumeFilter && (
+              <span
+                role="button"
+                aria-label="Clear resume filter"
+                className="flex-shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-hivio-primary/15 text-hivio-primary hover:bg-hivio-primary/25 transition-colors duration-150 text-[11px] font-bold leading-none"
+                onMouseDown={(e) => { e.stopPropagation(); setResumeFilter(null); setShowResumeMenu(false); }}
+              >×</span>
+            )}
+          </button>
+          {showResumeMenu && resumes.length > 0 && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg shadow-hivio-md overflow-hidden w-48">
+              {resumes.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onMouseDown={() => { setResumeFilter(r.id); setShowResumeMenu(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 truncate block ${
+                    resumeFilter === r.id ? 'text-hivio-primary' : 'text-hivio-text-primary dark:text-hivio-text-primary-dark'
+                  }`}
+                >
+                  {r.label || r.fileName}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {success && (
-        <div className="mb-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium px-4 py-3 rounded-xl">
+        <div className="mb-4 bg-hivio-status-offer-bg dark:bg-hivio-status-offer-bg-dark border border-hivio-status-offer/20 dark:border-hivio-status-offer-dark/20 text-hivio-status-offer dark:text-hivio-status-offer-dark text-sm font-medium px-4 py-3 rounded-md">
           {success}
         </div>
       )}
 
-      {activeAppsFiltered.length === 0 ? (
-        <div className={`${cardBg} ${border} rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.12)] text-center`}>
+      {!showArchived ? (
+        activeAppsFiltered.length === 0 ? (
+        <div className={`${cardBg} ${border} rounded-lg p-8 shadow-hivio text-center`}>
           <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 dark:text-blue-300">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
               </svg>
           </div>
           <p className={`text-sm font-semibold ${textMain}`}>
-            {activeFilter !== 'all' ? 'No applications with this status' : 'No applications yet'}
+            {activeFilter !== 'all' || resumeFilter ? 'No applications match this filter' : 'No applications yet'}
           </p>
           <p className={`text-xs ${textSub} font-medium mt-1`}>
-            {activeFilter !== 'all' ? 'Try changing the filter or add a new application.' : 'Click "+ Add" above to start tracking your job applications.'}
+            {activeFilter !== 'all' || resumeFilter ? 'Try changing the filter or add a new application.' : 'Track every role you apply to in one place.'}
           </p>
+          {activeFilter === 'all' && !resumeFilter && (
+            <button
+              type="button"
+              onClick={openAdd}
+              className="mt-4 inline-flex items-center gap-2 bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse text-sm font-medium px-5 py-2.5 rounded-md shadow-hivio-sm transition-colors duration-150"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Add application
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -695,11 +1092,10 @@ function Applications({ user }) {
             return (
               <div
                 key={a.id}
-                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.07)] hover:-translate-y-px transition-all duration-150"
+                className={`bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg p-4 shadow-hivio transition-all duration-150 ${!openMenuId ? 'hover:shadow-hivio-md hover:-translate-y-px' : openMenuId !== a.id ? 'pointer-events-none' : ''}`}
               >
                 {/* Top row: avatar + info + menu */}
                 <div className="flex items-start gap-3">
-                  {/* Company avatar */}
                   <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-sm select-none ${color.bg} ${color.text}`}>
                     {getCompanyInitials(a.company)}
                   </div>
@@ -716,23 +1112,23 @@ function Applications({ user }) {
 
                   {/* Right: status + menu */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${
                       a.status === 'Applied'
-                        ? 'bg-blue-50 dark:bg-blue-500/10 text-[#2C6E91] dark:text-blue-300'
+                        ? 'bg-hivio-status-applied-bg text-hivio-status-applied dark:bg-hivio-status-applied-bg-dark dark:text-white'
                         : a.status === 'Interview'
-                        ? 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                        ? 'bg-hivio-status-interview-bg text-hivio-status-interview dark:bg-hivio-status-interview-bg-dark dark:text-white'
                         : a.status === 'Offer'
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        ? 'bg-hivio-status-offer-bg text-hivio-status-offer dark:bg-hivio-status-offer-bg-dark dark:text-white'
+                        : 'bg-hivio-status-rejected-bg text-hivio-status-rejected dark:bg-hivio-status-rejected-bg-dark dark:text-white'
                     }`}>
                       {a.status}
                     </span>
 
-                    <div className="relative">
+                    <div className={`relative ${openMenuId === a.id ? 'z-20' : ''}`}>
                       <button
                         type="button"
                         onClick={() => setOpenMenuId((prev) => (prev === a.id ? null : a.id))}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-hivio-text-muted dark:text-hivio-text-muted-dark hover:text-hivio-text-primary dark:hover:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
                         aria-label="More actions"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -741,25 +1137,25 @@ function Applications({ user }) {
                       </button>
 
                       {openMenuId === a.id && (
-                        <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden z-10">
+                        <div className="absolute right-0 mt-1 w-44 bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-lg shadow-hivio-md overflow-hidden z-50" onMouseDown={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => openEdit(a)}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="w-full text-left px-4 py-3 text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
                           >
                             View / Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => handleArchive(a.id)}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="w-full text-left px-4 py-3 text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
                           >
                             Archive
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(a.id)}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            className="w-full text-left px-4 py-3 text-sm font-medium text-hivio-status-rejected hover:bg-hivio-status-rejected-bg transition-colors duration-150"
                           >
                             Delete
                           </button>
@@ -781,7 +1177,7 @@ function Applications({ user }) {
                   )}
 
                   {a.resumeId && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#2C6E91]/8 dark:bg-[#2C6E91]/15 text-[#2C6E91] dark:text-blue-300 text-[11px] font-semibold">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-hivio-primary-light text-hivio-primary text-[11px] font-medium dark:bg-[#1e2a3a] dark:text-white">
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       {resumeLabelById(a.resumeId)}
                     </span>
@@ -797,486 +1193,61 @@ function Applications({ user }) {
             );
           })}
         </div>
-      )}
-
-      {showArchived && archivedApps.length > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className={`text-sm font-bold ${textMain}`}>
-                Archived
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{archivedApps.length} archived application{archivedApps.length !== 1 ? 's' : ''}</p>
-            </div>
+      )
+      ) : (
+        /* Archived view */
+        archivedApps.length === 0 ? (
+          <div className={`${cardBg} ${border} rounded-lg p-8 shadow-hivio text-center`}>
+            <p className={`text-sm font-semibold ${textMain}`}>No archived applications</p>
+            <p className={`text-xs ${textSub} font-medium mt-1`}>Archived apps will appear here.</p>
           </div>
-          <div className="space-y-3">
-            {archivedApps.map((a) => (
-              <div
-                key={a.id}
-                className={`${cardBg} ${border} rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.12)]`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${textMain} truncate`}>
-                      {a.title}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">
-                      {a.company}
-                    </p>
-                    <p className="text-xs text-slate-400 font-medium mt-1">
-                      Applied on {a.date}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleUnarchive(a.id)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    Unarchive
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showAdd && (
-        <div
-          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
-          onClick={() => setShowAdd(false)}
-          style={{ overscrollBehavior: 'contain' }}
-        >
-          <div
-            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={closeAdd}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-
-            <div
-              className="p-4 space-y-3 pb-6"
-              style={{ overscrollBehavior: 'contain' }}
-            >
-              {error && (
-                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Company *
-                </label>
-                <input
-                  name="company"
-                  value={addForm.company}
-                  onChange={handleAddChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Job Title *
-                </label>
-                <input
-                  name="title"
-                  value={addForm.title}
-                  onChange={handleAddChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    value={addForm.date}
-                    onChange={handleAddChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Status *
-                  </label>
-                  <select
-                    name="status"
-                    value={addForm.status}
-                    onChange={handleAddChange}
-                    className={`${inputBase} select-field`}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Follow-Up
-                  </label>
-                  <input
-                    type="date"
-                    name="followUpDate"
-                    value={addForm.followUpDate}
-                    onChange={handleAddChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Location
-                  </label>
-                  <LocationField
-                    value={addForm.location}
-                    onChange={(v) => setAddForm((p) => ({ ...p, location: v }))}
-                    inputClassName={inputBase}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Resume Used
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowAddResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    {showAddResumeUpload ? 'Hide upload' : 'Upload new'}
-                  </button>
-                </div>
-
-                <select
-                  name="resumeId"
-                  value={addForm.resumeId}
-                  onChange={handleAddChange}
-                  className={`${inputBase} select-field`}
+        ) : (
+          <div>
+            <p className="text-xs font-semibold text-slate-400 mb-3">{archivedApps.length} archived application{archivedApps.length !== 1 ? 's' : ''}</p>
+            <div className="space-y-3">
+              {archivedApps.map((a) => (
+                <div
+                  key={a.id}
+                  className={`${cardBg} ${border} rounded-lg p-4 shadow-hivio`}
                 >
-                  <option value="">None</option>
-                  {resumes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label || r.fileName}
-                    </option>
-                  ))}
-                </select>
-
-                {showAddResumeUpload && (
-                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAddResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
-                      >
-                        Choose File
-                      </button>
-
-                      <input
-                        ref={addResumeInputRef}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleAddResumeFileChange}
-                      />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold ${textMain} truncate`}>{a.title}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 truncate">{a.company}</p>
+                      <p className="text-xs text-slate-400 font-medium mt-1">Applied on {a.date}</p>
                     </div>
-
-                    {addResumeFile && (
-                      <div className="mt-2">
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                          Selected: {addResumeFile.name}
-                        </p>
-
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
-                          Label
-                        </label>
-                        <input
-                          value={addResumeLabel}
-                          onChange={(e) => setAddResumeLabel(e.target.value)}
-                          className={inputBase}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={handleAddResumeUpload}
-                          className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors"
-                        >
-                          Upload & Link
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleUnarchive(a.id)}
+                      className="px-3 py-2 rounded-md border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 flex-shrink-0"
+                    >
+                      Unarchive
+                    </button>
                   </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  value={addForm.notes}
-                  onChange={handleAddChange}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveNewApp}
-                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1"
-              >
-                Save Application
-              </button>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )
       )}
 
-      {editingApp && (
-        <div
-          className="absolute inset-0 z-50 bg-black/40 p-4 overflow-y-auto"
-          onClick={closeEdit}
-          style={{ overscrollBehavior: 'contain' }}
-        >
-          <div
-            className="w-full max-w-md mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+      {/* FAB */}
+      {!showArchived && (
+        <div className="sticky bottom-4 flex justify-end pointer-events-none mt-4">
+          <button
+            type="button"
+            onClick={openAdd}
+            className="pointer-events-auto w-14 h-14 bg-hivio-primary hover:bg-hivio-primary-hover text-hivio-text-inverse rounded-full shadow-[0_4px_20px_rgba(99,102,241,0.45)] flex items-center justify-center transition-all duration-150 active:scale-95"
+            aria-label="Add application"
           >
-            <div className="flex items-center justify-end px-3 py-2 border-b border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-
-            <div
-              className="p-4 space-y-3 pb-6"
-              style={{ overscrollBehavior: 'contain' }}
-            >
-              {error && (
-                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-medium px-4 py-3 rounded-xl">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Company *
-                </label>
-                <input
-                  name="company"
-                  value={editForm.company}
-                  onChange={handleEditChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Job Title *
-                </label>
-                <input
-                  name="title"
-                  value={editForm.title}
-                  onChange={handleEditChange}
-                  className={inputBase}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    value={editForm.date}
-                    onChange={handleEditChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Status *
-                  </label>
-                  <select
-                    name="status"
-                    value={editForm.status}
-                    onChange={handleEditChange}
-                    className={`${inputBase} select-field`}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Follow-Up
-                  </label>
-                  <input
-                    type="date"
-                    name="followUpDate"
-                    value={editForm.followUpDate}
-                    onChange={handleEditChange}
-                    className={inputBase}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Location
-                  </label>
-                  <LocationField
-                    value={editForm.location}
-                    onChange={(v) => setEditForm((p) => ({ ...p, location: v }))}
-                    inputClassName={inputBase}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                    Resume Used
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowEditResumeUpload((p) => !p)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    {showEditResumeUpload ? 'Hide upload' : 'Upload new'}
-                  </button>
-                </div>
-
-                <select
-                  name="resumeId"
-                  value={editForm.resumeId}
-                  onChange={handleEditChange}
-                  className={`${inputBase} select-field`}
-                >
-                  <option value="">None</option>
-                  {resumes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label || r.fileName}
-                    </option>
-                  ))}
-                </select>
-
-                {editForm.resumeId ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-300 font-medium mt-1 ml-1">
-                    Currently linked: {resumeLabelById(editForm.resumeId)}
-                  </p>
-                ) : null}
-
-                {showEditResumeUpload && (
-                  <div className="mt-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 rounded-xl p-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleEditResumeFilePick}
-                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-white dark:hover:bg-slate-900"
-                      >
-                        Choose File
-                      </button>
-
-                      <input
-                        ref={editResumeInputRef}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleEditResumeFileChange}
-                      />
-                    </div>
-
-                    {editResumeFile && (
-                      <div className="mt-2">
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                          Selected: {editResumeFile.name}
-                        </p>
-
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mt-2 mb-1 ml-1">
-                          Label
-                        </label>
-                        <input
-                          value={editResumeLabel}
-                          onChange={(e) => setEditResumeLabel(e.target.value)}
-                          className={inputBase}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={handleEditResumeUpload}
-                          className="w-full mt-2 bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3 rounded-xl shadow-md transition-colors"
-                        >
-                          Upload & Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  value={editForm.notes}
-                  onChange={handleEditChange}
-                  rows={2}
-                  className={`${inputBase} resize-none`}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveEditsAndClose}
-                className="w-full bg-[#2C6E91] hover:bg-[#1a4a66] text-white font-semibold py-3.5 rounded-xl shadow-md transition-colors mt-1"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
         </div>
       )}
+
+
     </div>
   );
 }

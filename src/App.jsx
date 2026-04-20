@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase';
+import { getUserProfile, subscribeApplications, subscribeReminders } from './utils/db';
+
 import PhoneFrame from './components/PhoneFrame';
 import Register from './components/auth/Register';
 import Login from './components/auth/Login';
@@ -15,7 +19,6 @@ import NotificationToast from './components/NotificationToast';
 import './App.css';
 
 import { applyThemeClass, getStoredTheme } from './utils/theme';
-import { getRemindersStorageKey } from './utils/storage';
 import {
   getDueNotifications,
   getNotificationsEnabled,
@@ -27,27 +30,75 @@ import {
 } from './utils/notifications';
 
 function App() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [screen, setScreen] = useState('login');
+  const [currentUser, setCurrentUser] = useState(null); // merged Firebase Auth + Firestore profile
+  const [screen, setScreen] = useState('loading');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [openAppId, setOpenAppId] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [notificationsEnabled, setNotifsEnabled] = useState(getNotificationsEnabled);
   const scheduledTimeouts = useRef([]);
+
+  // Live data for notification checking (subscriptions set up when user is logged in)
+  const [liveApps, setLiveApps] = useState([]);
+  const [liveReminders, setLiveReminders] = useState([]);
 
   useEffect(() => {
     applyThemeClass(getStoredTheme());
     if (getNotificationsEnabled()) requestNotificationPermission();
   }, []);
 
+  // ── Firebase Auth state listener ─────────────────────────────────────────────
   useEffect(() => {
-    if (!notificationsEnabled || !currentUser) return;
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        setScreen('login');
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(firebaseUser.uid);
+        if (!profile) {
+          // Registered but no profile saved yet — shouldn't happen, but handle gracefully
+          setCurrentUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+          setScreen('profileSetup');
+          return;
+        }
+
+        const merged = { uid: firebaseUser.uid, email: firebaseUser.email, ...profile };
+        setCurrentUser(merged);
+
+        if (!profile.profile) {
+          setScreen('profileSetup');
+        } else {
+          setScreen('app');
+        }
+      } catch {
+        setCurrentUser(null);
+        setScreen('login');
+      }
+    });
+    return unsub;
+  }, []);
+
+  // ── Live subscriptions for notifications ─────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser?.uid || screen !== 'app') return;
+    const unsubApps = subscribeApplications(currentUser.uid, setLiveApps);
+    const unsubRem = subscribeReminders(currentUser.uid, setLiveReminders);
+    return () => { unsubApps(); unsubRem(); };
+  }, [currentUser?.uid, screen]);
+
+  // ── Notification polling ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!notificationsEnabled || !currentUser || screen !== 'app') return;
 
     function checkAndToast() {
-      const due = getDueNotifications(currentUser);
-      const shownIds = getShownNotifIds(currentUser);
+      const due = getDueNotifications(liveApps, liveReminders);
+      const shownIds = getShownNotifIds(currentUser.uid);
       due.forEach((n) => {
         if (!shownIds.has(n.id)) {
-          markNotifShown(currentUser, n.id);
+          markNotifShown(currentUser.uid, n.id);
           setToasts((prev) => [...prev, n]);
           fireNativeNotification(n.title, n.body);
         }
@@ -57,7 +108,7 @@ function App() {
     checkAndToast();
     const interval = setInterval(checkAndToast, 10_000);
     return () => clearInterval(interval);
-  }, [notificationsEnabled, currentUser]);
+  }, [notificationsEnabled, currentUser, screen, liveApps, liveReminders]);
 
   function dismissToast(id) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -74,7 +125,7 @@ function App() {
     const fireAt = new Date();
     fireAt.setHours(h, m, 0, 0);
     const ms = fireAt - Date.now();
-    if (ms <= 0) return; // time already passed
+    if (ms <= 0) return;
 
     const t = setTimeout(() => {
       pushToast({
@@ -93,7 +144,7 @@ function App() {
       if (prev.some((t) => t.id === notification.id)) return prev;
       return [...prev, notification];
     });
-    if (currentUser) markNotifShown(currentUser, notification.id);
+    if (currentUser) markNotifShown(currentUser.uid, notification.id);
     fireNativeNotification(notification.title, notification.body);
   }
 
@@ -104,46 +155,28 @@ function App() {
     if (!val) setToasts([]);
   }
 
-  function handleRegistrationComplete(user) {
-    setCurrentUser(user);
-    setScreen('profileSetup');
-  }
-
   function handleProfileComplete(updatedUser) {
     setCurrentUser(updatedUser);
     setScreen('app');
     setActiveTab('dashboard');
   }
 
-  function handleLogin(user) {
-    setCurrentUser(user);
-    // Schedule timeouts for today's future reminders
-    const today = new Date().toISOString().slice(0, 10);
-    try {
-      const reminders = JSON.parse(localStorage.getItem(getRemindersStorageKey(user)) || '[]');
-      reminders.filter((r) => r.date === today && !r.done && r.time).forEach(scheduleReminder);
-    } catch {}
-
-    if (!user.profile) {
-      setScreen('profileSetup');
-    } else {
-      setScreen('app');
-      setActiveTab('dashboard');
-    }
-  }
-
-  function handleLogout() {
+  async function handleLogout() {
     scheduledTimeouts.current.forEach(clearTimeout);
     scheduledTimeouts.current = [];
+    setLiveApps([]);
+    setLiveReminders([]);
     setCurrentUser(null);
-    setScreen('login');
     setActiveTab('dashboard');
+    await signOut(auth);
   }
+
+  // ── Screens ───────────────────────────────────────────────────────────────────
 
   function renderActiveTab() {
     switch (activeTab) {
       case 'applications':
-        return <Applications user={currentUser} />;
+        return <Applications user={currentUser} openAppId={openAppId} onOpenAppIdConsumed={() => setOpenAppId(null)} />;
       case 'resumes':
         return <Resumes user={currentUser} />;
       case 'calendar':
@@ -154,6 +187,7 @@ function App() {
         return (
           <Settings
             user={currentUser}
+            apps={liveApps}
             onLogout={handleLogout}
             onUpdateUser={setCurrentUser}
             notificationsEnabled={notificationsEnabled}
@@ -162,15 +196,33 @@ function App() {
           />
         );
       default:
-        return <Dashboard user={currentUser} onTabChange={setActiveTab} />;
+        return <Dashboard user={currentUser} onTabChange={setActiveTab} onOpenApp={(id) => { setOpenAppId(id); setActiveTab('applications'); }} />;
     }
   }
 
   function renderScreen() {
-    if (screen === 'profileSetup' && currentUser) {
+    if (screen === 'loading') {
       return (
-        <ProfileSetup user={currentUser} onProfileComplete={handleProfileComplete} />
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: '100%', background: 'var(--bg-app)',
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: 40, height: 40, border: '3px solid var(--border)',
+              borderTopColor: 'var(--brand)', borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+            }} />
+            <p style={{ color: 'var(--text-3)', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
+              Loading…
+            </p>
+          </div>
+        </div>
       );
+    }
+
+    if (screen === 'profileSetup' && currentUser) {
+      return <ProfileSetup user={currentUser} onProfileComplete={handleProfileComplete} />;
     }
 
     if (screen === 'app' && currentUser) {
@@ -186,12 +238,7 @@ function App() {
     }
 
     if (screen === 'register') {
-      return (
-        <Register
-          onRegistrationComplete={handleRegistrationComplete}
-          onSwitchToLogin={() => setScreen('login')}
-        />
-      );
+      return <Register onSwitchToLogin={() => setScreen('login')} />;
     }
 
     if (screen === 'forgotPassword') {
@@ -200,7 +247,6 @@ function App() {
 
     return (
       <Login
-        onLogin={handleLogin}
         onSwitchToRegister={() => setScreen('register')}
         onSwitchToForgotPassword={() => setScreen('forgotPassword')}
       />

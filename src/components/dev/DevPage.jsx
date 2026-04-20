@@ -1,217 +1,186 @@
 import React, { useState } from 'react';
-import { getAllUsers } from '../../utils/storage';
+import { auth, db } from '../../firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { seedUserData, clearUserData } from '../../utils/seedData';
 
+const STARS = ['', '★', '★★', '★★★', '★★★★', '★★★★★'];
+
 function DevPage({ onBack }) {
-  const [, setRefreshKey] = useState(0);
-  const [seededEmails, setSeededEmails] = useState({});
-  const [confirmClear, setConfirmClear] = useState(null);
+  const user = auth.currentUser;
+  const [targetUid, setTargetUid] = useState(user?.uid || '');
+  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [counts, setCounts] = useState(null);
+  const [countLoading, setCountLoading] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [fbLoading, setFbLoading] = useState(false);
 
-  function refresh() {
-    setRefreshKey((k) => k + 1);
+  async function handleSeed() {
+    if (!targetUid.trim()) return setStatus('Enter a UID first.');
+    setLoading(true);
+    setStatus('');
+    try {
+      await seedUserData(targetUid.trim());
+      setStatus(`Seed complete — 20–24 apps, resumes & reminders written to ${targetUid.trim()}.`);
+    } catch (e) {
+      setStatus(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const users = getAllUsers(); // eslint-disable-line react-hooks/exhaustive-deps
-  const feedbackList = (() => { try { return JSON.parse(localStorage.getItem('hivio_feedback') || '[]'); } catch { return []; } })();
-  const userList = Object.values(users);
-
-  function handleSeed(email) {
-    seedUserData(email);
-    setSeededEmails((prev) => ({ ...prev, [email]: true }));
-    refresh();
+  async function handleClear() {
+    if (!targetUid.trim()) return setStatus('Enter a UID first.');
+    setLoading(true);
+    setStatus('');
+    try {
+      await clearUserData(targetUid.trim());
+      setStatus(`Cleared all data for ${targetUid.trim()}.`);
+    } catch (e) {
+      setStatus(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleClear(email) {
-    clearUserData(email);
-    setConfirmClear(null);
-    setSeededEmails((prev) => ({ ...prev, [email]: false }));
-    refresh();
+  async function handleCount() {
+    if (!targetUid.trim()) return;
+    setCountLoading(true); setCounts(null);
+    try {
+      const [apps, resumes, reminders] = await Promise.all([
+        getDocs(collection(db, 'users', targetUid.trim(), 'applications')),
+        getDocs(collection(db, 'users', targetUid.trim(), 'resumes')),
+        getDocs(collection(db, 'users', targetUid.trim(), 'reminders')),
+      ]);
+      setCounts({ apps: apps.size, resumes: resumes.size, reminders: reminders.size });
+    } catch (e) { setCounts({ error: e.message }); }
+    finally { setCountLoading(false); }
+  }
+
+  async function handleLoadFeedback() {
+    setFbLoading(true); setFeedback(null);
+    try {
+      const snap = await getDocs(collection(db, 'feedback'));
+      const entries = snap.docs
+        .map((d) => d.data())
+        .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+      setFeedback(entries);
+    } catch (e) { setFeedback([{ error: e.message }]); }
+    finally { setFbLoading(false); }
   }
 
   return (
     <div className="flex flex-col px-5 pt-6 pb-6 bg-[#F7F9FC] dark:bg-slate-950">
+      <div className="flex items-start gap-3 mb-5">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-1 w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex-shrink-0 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        )}
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Developer Console</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Seed or clear any account by UID.</p>
+        </div>
+      </div>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-5">
-        <div className="flex items-start gap-3">
-          {onBack && (
+      {/* Auth info */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 mb-4">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Signed in as</p>
+        <p className="text-sm font-mono text-slate-800 dark:text-slate-200 break-all">{user?.uid || 'Not signed in'}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{user?.email || ''}</p>
+      </div>
+
+      {/* Seed controls */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Target UID</p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={targetUid}
+            onChange={(e) => setTargetUid(e.target.value)}
+            placeholder="Paste a Firebase UID…"
+            className="flex-1 px-3 py-2 rounded-xl text-sm font-mono bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {user?.uid && targetUid !== user.uid && (
             <button
               type="button"
-              onClick={onBack}
-              className="mt-1 w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex-shrink-0 transition-colors"
-              aria-label="Back"
+              onClick={() => setTargetUid(user.uid)}
+              className="text-xs text-indigo-500 hover:underline whitespace-nowrap"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+              Use mine
             </button>
           )}
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Developer Console
-              </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
-                Dev Only
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-300 font-medium">
-              localStorage snapshot · {userList.length} registered user{userList.length !== 1 ? 's' : ''}
-            </p>
-          </div>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 flex-shrink-0"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-          </svg>
-          Refresh
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSeed}
+            disabled={loading || !targetUid.trim()}
+            className="flex-1 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors"
+          >
+            {loading ? 'Working…' : 'Seed account'}
+          </button>
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={loading || !targetUid.trim()}
+            className="flex-1 py-2 rounded-xl text-sm font-semibold bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white transition-colors"
+          >
+            {loading ? 'Working…' : 'Clear account'}
+          </button>
+        </div>
+        {status && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">{status}</p>
+        )}
+      </div>
+
+      {/* Doc count */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 mt-4">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Data Summary</p>
+        <button type="button" onClick={handleCount} disabled={countLoading || !targetUid.trim()}
+          className="w-full py-2 rounded-xl text-sm font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-800 dark:text-slate-100 transition-colors">
+          {countLoading ? 'Counting…' : 'Check data for UID above'}
         </button>
+        {counts && !counts.error && (
+          <div className="flex gap-4 text-sm">
+            <span className="text-slate-700 dark:text-slate-300"><span className="font-bold">{counts.apps}</span> apps</span>
+            <span className="text-slate-700 dark:text-slate-300"><span className="font-bold">{counts.resumes}</span> resumes</span>
+            <span className="text-slate-700 dark:text-slate-300"><span className="font-bold">{counts.reminders}</span> reminders</span>
+          </div>
+        )}
+        {counts?.error && <p className="text-xs text-red-500">{counts.error}</p>}
       </div>
 
-      {/* Aggregate stats */}
-      <div className="grid grid-cols-1 gap-2 mb-4">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-300 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">Registered Users</p>
-          <p className="text-3xl font-black mt-1 text-slate-900 dark:text-slate-100">{userList.length}</p>
-        </div>
-      </div>
-
-      {/* Feedback */}
-      {feedbackList.length > 0 && (
-        <div className="mb-4">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
-            User Feedback ({feedbackList.length})
-          </h2>
-          <div className="space-y-2">
-            {feedbackList.map((fb) => (
-              <div key={fb.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-300 dark:border-slate-800 px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <div className="flex items-center gap-0.5">
-                    {[1,2,3,4,5].map((s) => (
-                      <svg key={s} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                        fill={s <= fb.rating ? '#FBBF24' : 'none'}
-                        stroke={s <= fb.rating ? '#FBBF24' : '#CBD5E1'}>
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                      </svg>
-                    ))}
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 ml-1.5">
-                      {['','Poor','Fair','Good','Great','Excellent'][fb.rating]}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400">{fb.submittedAt ? new Date(fb.submittedAt).toLocaleDateString() : ''}</span>
+      {/* Feedback reader */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 mt-4">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">User Feedback</p>
+        <button type="button" onClick={handleLoadFeedback} disabled={fbLoading}
+          className="w-full py-2 rounded-xl text-sm font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-800 dark:text-slate-100 transition-colors">
+          {fbLoading ? 'Loading…' : feedback ? 'Refresh' : 'Load feedback'}
+        </button>
+        {feedback && (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {feedback.length === 0 && <p className="text-xs text-slate-400">No feedback yet.</p>}
+            {feedback.map((f, i) => f.error ? (
+              <p key={i} className="text-xs text-red-500">{f.error}</p>
+            ) : (
+              <div key={f.id || i} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{f.email}</span>
+                  <span className="text-xs text-amber-400">{STARS[f.rating] || ''}</span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{fb.email}</p>
-                {fb.comment && <p className="text-xs text-slate-700 dark:text-slate-200 mt-1 font-medium">{fb.comment}</p>}
+                {f.comment && <p className="text-xs text-slate-500 dark:text-slate-400">{f.comment}</p>}
+                <p className="text-[11px] text-slate-400">{new Date(f.submittedAt).toLocaleString()}</p>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* User cards */}
-      <div className="space-y-3">
-        {userList.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-sm text-slate-400 font-medium">No users registered yet.</p>
-            <p className="text-xs text-slate-400 mt-1">Create an account to see data here.</p>
-          </div>
         )}
-
-        {userList.map((user) => {
-          const e = user.email.toLowerCase();
-          const isDev = e === 'test@hivio.local';
-
-          return (
-            <div
-              key={e}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden"
-            >
-              {/* User header */}
-              <div className="flex items-center gap-3 p-4">
-                <div className="w-9 h-9 rounded-full bg-[#2C6E91] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{user.name || '—'}</p>
-                  <p className="text-xs text-slate-400 font-medium truncate">{user.email}</p>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {isDev && (
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#2C6E91]/10 text-[#2C6E91] border border-[#2C6E91]/20">
-                      DEV
-                    </span>
-                  )}
-                  {user.profile ? (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      {user.profile.gradYear}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
-                      No profile
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* School / program */}
-              {user.profile && (
-                <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                    {user.profile.school}
-                    {user.profile.program ? ` · ${user.profile.program}` : ''}
-                    {user.profile.gradYear ? ` · Class of ${user.profile.gradYear}` : ''}
-                  </p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => handleSeed(e)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                    seededEmails[e]
-                      ? 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
-                      : 'border-[#2C6E91]/40 text-[#2C6E91] hover:bg-[#2C6E91]/5'
-                  }`}
-                >
-                  {seededEmails[e] ? '✓ Seeded' : 'Seed Data'}
-                </button>
-
-                {confirmClear === e ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleClear(e)}
-                      className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
-                    >
-                      Confirm Clear
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmClear(null)}
-                      className="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmClear(e)}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                  >
-                    Clear Data
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

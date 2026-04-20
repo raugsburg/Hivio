@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getApplicationsStorageKey, getApplicationsIntentKey, getResumesStorageKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { createPortal } from 'react-dom';
+import { getApplicationsIntentKey, getDismissedStaleKey, safeReadJSON, safeWriteJSON } from '../../utils/storage';
+import { subscribeApplications, subscribeResumes } from '../../utils/db';
 import { DEFAULT_DASHBOARD_ORDER } from '../../data/constants';
 import { startOfDayISO, isValidDateStringYYYYMMDD } from '../../utils/dateUtils';
 
@@ -8,15 +10,15 @@ const WEEKLY_GOAL = 5;
 function statusBadgeClasses(status) {
   switch (status) {
     case 'Applied':
-      return 'bg-blue-50 dark:bg-blue-500/10 text-[#2C6E91] border border-blue-100 dark:border-blue-500/20';
+      return 'bg-hivio-status-applied-bg text-hivio-status-applied border border-hivio-status-applied/20 dark:bg-hivio-status-applied-bg-dark dark:text-white dark:border-hivio-status-applied-dark/20';
     case 'Interview':
-      return 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-500/20';
+      return 'bg-hivio-status-interview-bg text-hivio-status-interview border border-hivio-status-interview/20 dark:bg-hivio-status-interview-bg-dark dark:text-white dark:border-hivio-status-interview-dark/20';
     case 'Offer':
-      return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20';
+      return 'bg-hivio-status-offer-bg text-hivio-status-offer border border-hivio-status-offer/20 dark:bg-hivio-status-offer-bg-dark dark:text-white dark:border-hivio-status-offer-dark/20';
     case 'Rejected':
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700';
+      return 'bg-hivio-status-rejected-bg text-hivio-status-rejected border border-hivio-status-rejected/20 dark:bg-hivio-status-rejected-bg-dark dark:text-white dark:border-hivio-status-rejected-dark/20';
     default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700';
+      return 'bg-hivio-status-ghosted-bg text-hivio-status-ghosted border border-hivio-status-ghosted/20';
   }
 }
 
@@ -29,88 +31,41 @@ function formatDayLabel(date) {
   return date.toLocaleDateString(undefined, { weekday: 'short' });
 }
 
-function ActivityLineChart({ days, values }) {
-  const width = 340;
-  const height = 120;
-  const padX = 8;
-  const padY = 16;
-  const innerW = width - padX * 2;
-  const innerH = height - padY * 2;
+function formatRelativeDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === -1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function ActivityBarChart({ days, values }) {
   const max = Math.max(1, ...values);
 
-  const points = values.map((v, i) => ({
-    x: padX + (i / Math.max(1, values.length - 1)) * innerW,
-    y: padY + innerH - (v / max) * innerH,
-    v,
-    day: formatDayLabel(days[i]),
-  }));
-
-  // Smooth Catmull-Rom cubic bezier
-  function smoothPath(pts) {
-    if (pts.length < 2) return `M ${pts[0].x},${pts[0].y}`;
-    let d = `M ${pts[0].x},${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const prev = pts[i - 1] || pts[i];
-      const curr = pts[i];
-      const next = pts[i + 1];
-      const after = pts[i + 2] || pts[i + 1];
-      const cp1x = curr.x + (next.x - prev.x) / 6;
-      const cp1y = curr.y + (next.y - prev.y) / 6;
-      const cp2x = next.x - (after.x - curr.x) / 6;
-      const cp2y = next.y - (after.y - curr.y) / 6;
-      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next.x},${next.y}`;
-    }
-    return d;
-  }
-
-  const linePath = smoothPath(points);
-  const areaPath = `${linePath} L ${points[points.length - 1].x},${height - padY} L ${points[0].x},${height - padY} Z`;
-  const peakIdx = values.indexOf(Math.max(...values));
-
-  // Subtle horizontal grid lines at 33% and 66%
-  const gridYs = [0.33, 0.66].map((pct) => padY + innerH - pct * innerH);
-
   return (
-    <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 120 }}>
-        <defs>
-          <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(44,110,145,0.22)" />
-            <stop offset="85%" stopColor="rgba(44,110,145,0.0)" />
-          </linearGradient>
-        </defs>
-
-        {gridYs.map((y) => (
-          <line key={y} x1={padX} y1={y} x2={width - padX} y2={y}
-            stroke="rgba(148,163,184,0.15)" strokeWidth="1" strokeDasharray="3 4" />
-        ))}
-        <line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY}
-          stroke="rgba(148,163,184,0.25)" strokeWidth="1" />
-
-        <path d={areaPath} fill="url(#activityFill)" />
-        <path d={linePath} fill="none" stroke="#2C6E91" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round" />
-
-        {points.map((p, i) => (
-          <g key={`pt-${i}`}>
-            {i === peakIdx && p.v > 0 && (
-              <circle cx={p.x} cy={p.y} r="8" fill="rgba(44,110,145,0.1)" />
-            )}
-            <circle cx={p.x} cy={p.y} r="3.5" fill="white" stroke="#2C6E91" strokeWidth="2" />
-          </g>
-        ))}
-      </svg>
-
-      <div className="grid grid-cols-7 mt-2">
-        {points.map((p, i) => (
-          <div key={`lbl-${i}`} className="flex flex-col items-center gap-0.5">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{p.day}</p>
-            <p className={`text-[11px] font-bold ${p.v > 0 ? 'text-slate-700 dark:text-slate-200' : 'text-slate-300 dark:text-slate-600'}`}>
-              {p.v > 0 ? p.v : '-'}
+    <div className="flex items-flex-end gap-1.5" style={{ height: 110 }}>
+      {values.map((v, i) => {
+        const barH = v === 0 ? 6 : Math.round((v / max) * 72) + 10;
+        const day = formatDayLabel(days[i]);
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
+            <p className={`text-[10px] font-semibold ${v > 0 ? 'text-slate-700 dark:text-slate-200' : 'text-slate-300 dark:text-slate-600'}`}>
+              {v > 0 ? v : '—'}
             </p>
+            <div
+              className="w-full rounded-md"
+              style={{
+                height: barH,
+                background: v === 0 ? 'rgba(148,163,184,0.15)' : 'rgba(99,102,241,0.35)',
+              }}
+            />
+            <p className="text-[9px] font-medium text-slate-400 uppercase">{day}</p>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
@@ -144,7 +99,7 @@ function StatusDistribution({ total, items, onSelect }) {
               key={item.id}
               type="button"
               onClick={() => onSelect(item.id)}
-              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+              className="flex items-center justify-between gap-2 rounded-md border border-hivio-border dark:border-hivio-border-dark px-3 py-2.5 bg-hivio-surface dark:bg-hivio-surface-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 text-left"
             >
               <span className="inline-flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
@@ -162,20 +117,30 @@ function StatusDistribution({ total, items, onSelect }) {
   );
 }
 
-function ApplicationFunnel({ applied, interview, offer, onSelect }) {
+function ApplicationFunnel({ total, interviewed, offer, rejected, onSelect }) {
   const rows = [
-    { id: 'Applied', label: 'Applied', value: applied, color: '#2C6E91' },
-    { id: 'Interview', label: 'Interview', value: interview, color: '#0F766E' },
-    { id: 'Offer', label: 'Offer', value: offer, color: '#D97706' },
+    { id: 'All', label: 'Total Applied', value: total, color: '#6366F1' },
+    { id: 'Interview', label: 'Got Interview', value: interviewed, color: '#0F766E' },
+    { id: 'Offer', label: 'Got Offer', value: offer, color: '#D97706' },
+    { id: 'Rejected', label: 'Rejected', value: rejected, color: '#ef4444' },
   ];
-  const max = Math.max(1, applied, interview, offer);
+  // Scale all bars relative to total so proportions are honest
+  const max = Math.max(1, total);
 
   return (
     <div>
       {rows.map((r, i) => {
         const pct = Math.round((r.value / max) * 100);
         const prev = rows[i - 1];
-        const convRate = prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null;
+        const convRate = r.id === 'Rejected'
+          ? (total > 0 ? Math.round((r.value / total) * 100) : null)
+          : (prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null);
+        const connectorLabels = {
+          Interview: `${convRate}% got interviews`,
+          Offer: `${convRate}% got offers`,
+          Rejected: `${convRate}% of total rejected`,
+        };
+        const connectorLabel = connectorLabels[r.id] || `${convRate}%`;
 
         return (
           <div key={r.id}>
@@ -184,13 +149,13 @@ function ApplicationFunnel({ applied, interview, offer, onSelect }) {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600 flex-shrink-0">
                   <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
                 </svg>
-                <span className="text-[10px] font-semibold text-slate-400">{convRate}% moved forward</span>
+                <span className="text-[10px] font-semibold text-slate-400">{connectorLabel}</span>
               </div>
             )}
             <button
               type="button"
               onClick={() => onSelect(r.id)}
-              className="w-full text-left rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              className="w-full text-left rounded-md px-3 py-2.5 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -224,7 +189,6 @@ function ResumeOutcomeDonut({ data }) {
     { key: 'interviews', value: data.interviews, color: '#0F766E' },
     { key: 'offers', value: data.offers, color: '#D97706' },
     { key: 'rejected', value: data.rejected, color: '#ef4444' },
-    { key: 'applied', value: data.applied, color: '#2C6E91' },
   ].filter((s) => s.value > 0);
 
   let currentOffset = 0;
@@ -279,32 +243,137 @@ function HealthBar({ label, score, max, color, detail }) {
   );
 }
 
-function Dashboard({ user, onTabChange }) {
-  const widgets = user.dashboardWidgets || {
-    statusBreakdown: true,
+const ROLE_PATTERNS = [
+  { key: 'data', terms: ['data', 'analyst', 'analytics', 'scientist', 'science', 'business intelligence', 'bi '] },
+  { key: 'engineering', terms: ['engineer', 'developer', 'software', 'backend', 'frontend', 'fullstack', 'full-stack', 'swe', 'programmer', 'devops', 'platform'] },
+  { key: 'product', terms: ['product manager', 'product owner', ' pm', 'program manager', 'project manager'] },
+  { key: 'design', terms: ['design', ' ux', ' ui ', 'user experience', 'user interface', 'visual'] },
+  { key: 'marketing', terms: ['marketing', 'growth', 'seo', 'content', 'brand', 'social media'] },
+  { key: 'finance', terms: ['finance', 'financial', 'accounting', 'accountant', 'actuar', 'investment'] },
+];
+
+function detectRoleCategories(apps) {
+  const found = new Set();
+  apps.forEach((a) => {
+    const title = (' ' + (a.title || '') + ' ').toLowerCase();
+    ROLE_PATTERNS.forEach(({ key, terms }) => {
+      if (terms.some((t) => title.includes(t))) found.add(key);
+    });
+  });
+  return found;
+}
+
+function getResumeDetail(r, linkedApps = []) {
+  const rating = r.interviewRate >= 0.35 ? 'strong'
+    : r.interviewRate >= 0.10 ? 'mixed'
+    : 'low';
+
+  const tips = [];
+
+  // 1. Performance diagnosis
+  if (rating === 'strong') {
+    tips.push({
+      label: 'Strong resume',
+      detail: `${formatPct(r.interviewRate)} interview rate — this version is resonating. Keep using it for similar roles.`,
+    });
+  } else if (rating === 'mixed') {
+    tips.push({
+      label: 'Average performance',
+      detail: 'Your interview rate is in the average range. Consider tailoring this resume more closely to each job description to push it higher.',
+    });
+  } else {
+    tips.push({
+      label: 'Low response rate',
+      detail: `Only ${formatPct(r.interviewRate)} interview rate — this resume may not be passing initial screening. ATS keyword gaps or lack of tailoring are the most common causes.`,
+    });
+  }
+
+  // Offer gap: interviews exist but no offers
+  if (r.offers === 0 && r.interviews >= 2) {
+    tips.push({
+      label: 'Getting interviews but no offers yet',
+      detail: 'Your resume is opening doors but conversion isn\'t there yet. Shift focus to interview prep — research companies, practice behaviorals, and prepare strong closing questions.',
+    });
+  }
+
+  // High rejections with few interviews
+  if (r.rejected >= 3 && r.interviews <= 1 && rating !== 'strong') {
+    tips.push({
+      label: 'High rejections with few interviews',
+      detail: 'This pattern suggests the resume may not be passing initial screening. Review whether your experience level matches the roles and check for keyword mismatches.',
+    });
+  }
+
+  // 2. Structural tips
+  // Role diversity
+  if (linkedApps.length >= 3) {
+    const categories = detectRoleCategories(linkedApps);
+    if (categories.size >= 2) {
+      tips.push({
+        label: 'Consider separate versions per role type',
+        detail: 'This resume is being used across different role types. Tailored resumes get 7x more interviews than generic ones — create a dedicated version for each target role.',
+      });
+    }
+  }
+
+  // ATS tip for any sub-35% resume (if room)
+  if (r.interviewRate < 0.35 && tips.length < 4) {
+    tips.push({
+      label: 'Mirror keywords from each job posting',
+      detail: '75% of resumes are filtered out by ATS before a human reads them. Copy the exact skill and title keywords from job descriptions into your resume where they genuinely apply.',
+    });
+  }
+
+  // 3. Sample size warning — always last
+  if (r.applications < 5) {
+    tips.push({
+      label: 'Small sample size',
+      detail: `Only ${r.applications} application${r.applications !== 1 ? 's' : ''} linked — feedback will sharpen as you add more. Results can swing significantly this early.`,
+    });
+  } else if (r.applications >= 10) {
+    tips[0] = { ...tips[0], detail: tips[0].detail + ' (Based on 10+ applications — this feedback is reliable.)' };
+  }
+
+  return { rating, tips: tips.slice(0, 4) };
+}
+
+function Dashboard({ user, onTabChange, onOpenApp }) {
+  const widgets = {
+    pipelineHealth: true,
     weeklyActivity: true,
     applicationFunnel: true,
+    resumePerformance: true,
     upcomingTasks: true,
     recentApps: true,
     rejectionRate: false,
+    ...(user.dashboardWidgets || {}),
+    // These widgets have been removed — always off regardless of saved prefs
+    weeklyGoal: false,
+    statusBreakdown: false,
   };
 
-  const dashboardOrder = user.dashboardOrder || DEFAULT_DASHBOARD_ORDER;
+  const REMOVED_WIDGETS = ['weeklyGoal', 'statusBreakdown'];
+  const dashboardOrder = (user.dashboardOrder || DEFAULT_DASHBOARD_ORDER).filter(
+    (id) => !REMOVED_WIDGETS.includes(id)
+  );
 
-  const appsKey = useMemo(() => getApplicationsStorageKey(user), [user]);
-  const resumesKey = useMemo(() => getResumesStorageKey(user), [user]);
-  const intentKey = useMemo(() => getApplicationsIntentKey(user), [user]);
+  const intentKey = useMemo(() => getApplicationsIntentKey(user?.uid), [user]);
+  const dismissedStaleKey = useMemo(() => getDismissedStaleKey(user?.uid), [user]);
 
   const [apps, setApps] = useState([]);
   const [resumes, setResumes] = useState([]);
-
-  const dismissedStaleKey = `hivio_dismissed_stale_${user?.email?.toLowerCase() || 'anon'}`;
   const [dismissedStaleIds, setDismissedStaleIds] = useState(() => safeReadJSON(dismissedStaleKey, []));
+  const [resumeDetailId, setResumeDetailId] = useState(null);
+  const [showHealthInfo, setShowHealthInfo] = useState(false);
 
   useEffect(() => {
-    setApps(safeReadJSON(appsKey, []));
-    setResumes(safeReadJSON(resumesKey, []));
-  }, [appsKey, resumesKey]);
+    if (!user?.uid) return;
+    const unsubApps = subscribeApplications(user.uid, setApps);
+    const unsubResumes = subscribeResumes(user.uid, setResumes);
+    return () => { unsubApps(); unsubResumes(); };
+  }, [user?.uid]);
+
+  const weeklyGoalTarget = user?.weeklyGoalTarget ? Math.max(1, Number(user.weeklyGoalTarget)) : WEEKLY_GOAL;
 
   const today = new Date();
   const daysLeftInWeek = 7 - today.getDay();
@@ -322,10 +391,10 @@ function Dashboard({ user, onTabChange }) {
     last7,
     last7Keys,
     activityValues,
+    overdueFollowups,
     upcomingFollowups,
     recentApps,
     resumeStats,
-    resumeFeedback,
     thisWeekCount,
     lastWeekCount,
     velocityDelta,
@@ -334,6 +403,10 @@ function Dashboard({ user, onTabChange }) {
     healthScore,
     healthLabel,
     healthColor,
+    healthActivity,
+    healthConversion,
+    healthCoverage,
+    rollingWeeklyAvg,
   } = useMemo(() => {
     const now = new Date();
     const activeApps = apps.filter((a) => !a.archived);
@@ -375,13 +448,18 @@ function Dashboard({ user, onTabChange }) {
 
     const activityValues = last7Keys.map((k) => activityByDay[k] || 0);
 
-    const upcomingFollowups = activeApps
+    const todayStart = new Date(startOfDayISO(now) + 'T00:00:00');
+    const appsWithDates = activeApps
       .filter((a) => isValidDateStringYYYYMMDD(a.followUpDate))
-      .map((a) => ({
-        ...a,
-        followUpDateObj: new Date(`${a.followUpDate}T00:00:00`),
-      }))
-      .filter((a) => a.followUpDateObj >= new Date(startOfDayISO(now) + 'T00:00:00'))
+      .map((a) => ({ ...a, followUpDateObj: new Date(`${a.followUpDate}T00:00:00`) }));
+
+    const overdueFollowups = appsWithDates
+      .filter((a) => a.followUpDateObj < todayStart)
+      .sort((a, b) => a.followUpDateObj - b.followUpDateObj)
+      .slice(0, 3);
+
+    const upcomingFollowups = appsWithDates
+      .filter((a) => a.followUpDateObj >= todayStart)
       .sort((a, b) => a.followUpDateObj - b.followUpDateObj)
       .slice(0, 3);
 
@@ -431,19 +509,6 @@ function Dashboard({ user, onTabChange }) {
         return b.applications - a.applications;
       });
 
-    const resumeFeedback = resumeStats
-      .filter((r) => r.applications >= 2)
-      .map((r) => {
-        if (r.interviewRate >= 0.35) {
-          return `${r.label} is performing strongly with ${formatPct(r.interviewRate)} interview rate.`;
-        }
-        if (r.rejected >= Math.max(2, r.interviews + r.offers)) {
-          return `${r.label} has high rejection volume. Consider revising summary, keywords, and bullets.`;
-        }
-        return `${r.label} has mixed signal. Keep testing and tailor this version to specific job posts.`;
-      })
-      .slice(0, 3);
-
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay());
     weekStart.setHours(0, 0, 0, 0);
@@ -461,6 +526,14 @@ function Dashboard({ user, onTabChange }) {
 
     const velocityDelta = thisWeekCount - lastWeekCount;
 
+    // 4-week rolling average for activity score
+    const fourWeeksAgo = new Date(weekStart);
+    fourWeeksAgo.setDate(weekStart.getDate() - 28);
+    const rollingCount = activeApps.filter(
+      (a) => new Date(a.createdAt || a.date || 0) >= fourWeeksAgo
+    ).length;
+    const rollingWeeklyAvg = rollingCount / 4;
+
     const staleApps = activeApps.filter((a) => {
       if (a.status !== 'Applied' || a.followUpDate) return false;
       const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
@@ -473,18 +546,20 @@ function Dashboard({ user, onTabChange }) {
     const followUpCoverage =
       appsNeedingCoverage.length > 0
         ? appsNeedingCoverage.filter((a) => a.followUpDate).length / appsNeedingCoverage.length
-        : 1;
+        : 0;
 
     // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
-    const healthActivity = Math.min(35, Math.round((thisWeekCount / WEEKLY_GOAL) * 35));
+    // Activity: based on 4-week rolling average vs user's weekly goal
+    const healthActivity = Math.min(35, Math.round((rollingWeeklyAvg / weeklyGoalTarget) * 35));
+    // Conversion: 8% interview rate = full score (new-grad benchmark: typical is 3–5%, strong is 8%+)
     const healthConversion =
-      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 20) * 35)) : 0;
+      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 8) * 35)) : 0;
     const healthCoverage = Math.round(followUpCoverage * 30);
     const healthScore = healthActivity + healthConversion + healthCoverage;
     const healthLabel =
       healthScore >= 80 ? 'Strong' : healthScore >= 60 ? 'Active' : healthScore >= 40 ? 'Slow' : 'Stalled';
     const healthColor =
-      healthScore >= 80 ? '#0F766E' : healthScore >= 60 ? '#2C6E91' : healthScore >= 40 ? '#D97706' : '#ef4444';
+      healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#6366F1' : healthScore >= 40 ? '#F59E0B' : '#EF4444';
 
     return {
       activeApps,
@@ -499,10 +574,10 @@ function Dashboard({ user, onTabChange }) {
       last7,
       last7Keys,
       activityValues,
+      overdueFollowups,
       upcomingFollowups,
       recentApps,
       resumeStats,
-      resumeFeedback,
       thisWeekCount,
       lastWeekCount,
       velocityDelta,
@@ -511,8 +586,14 @@ function Dashboard({ user, onTabChange }) {
       healthScore,
       healthLabel,
       healthColor,
+      healthActivity,
+      healthConversion,
+      healthCoverage,
+      rollingWeeklyAvg,
     };
-  }, [apps, resumes]);
+  }, [apps, resumes, weeklyGoalTarget]);
+
+  const resumeDetail = resumeDetailId ? resumeStats.find((r) => r.resumeId === resumeDetailId) ?? null : null;
 
   function resumeLabelById(resumeId) {
     if (!resumeId) return '';
@@ -568,7 +649,7 @@ function Dashboard({ user, onTabChange }) {
     };
     const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
     const statusRows = [
-      { label: 'Applied', value: appliedCount, color: '#2C6E91' },
+      { label: 'Applied', value: appliedCount, color: '#6366F1' },
       { label: 'Interview', value: interviewCount, color: '#0F766E' },
       { label: 'Offer', value: offerCount, color: '#D97706' },
       { label: 'Rejected', value: rejectedCount, color: '#64748B' },
@@ -590,7 +671,7 @@ function Dashboard({ user, onTabChange }) {
       `<tr>
         <td style="${td}">${a.company}</td>
         <td style="${td}">${a.title}</td>
-        <td style="${td};color:#2C6E91;font-weight:600">${a.status}</td>
+        <td style="${td};color:#6366F1;font-weight:600">${a.status}</td>
         <td style="${td};color:${c.muted}">${a.date || ''}</td>
       </tr>`
     ).join('');
@@ -604,7 +685,7 @@ function Dashboard({ user, onTabChange }) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: ${c.text}; background: ${c.bg}; padding: 40px; }
     @media print { body { padding: 20px; } }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2C6E91; padding-bottom: 16px; margin-bottom: 28px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #6366F1; padding-bottom: 16px; margin-bottom: 28px; }
     .logo { font-size: 22px; font-weight: 900; color: #2C6E91; letter-spacing: -0.5px; }
     .meta { text-align: right; font-size: 12px; color: ${c.muted}; line-height: 1.8; }
     .section { margin-bottom: 28px; }
@@ -636,7 +717,7 @@ function Dashboard({ user, onTabChange }) {
   <div class="section">
     <div class="section-title">Application Snapshot</div>
     <div class="stat-grid">
-      <div class="stat-box"><div class="stat-label">Total Active</div><div class="stat-value" style="color:#2C6E91">${counts.total}</div></div>
+      <div class="stat-box"><div class="stat-label">Total Active</div><div class="stat-value" style="color:#6366F1">${counts.total}</div></div>
       <div class="stat-box"><div class="stat-label">Interview Rate</div><div class="stat-value" style="color:#0F766E">${interviewRate}%</div></div>
       <div class="stat-box"><div class="stat-label">Offer Rate</div><div class="stat-value" style="color:#D97706">${offerRate}%</div></div>
       <div class="stat-box"><div class="stat-label">Interviews Landed</div><div class="stat-value">${interviewsLanded}</div></div>
@@ -704,8 +785,13 @@ function Dashboard({ user, onTabChange }) {
     if (typeof onTabChange === 'function') onTabChange('applications');
   }
 
+  function navigateToApp(id) {
+    if (typeof onOpenApp === 'function') onOpenApp(id);
+  }
+
   return (
-    <div className="flex flex-col px-5 pt-6 pb-6 bg-[#F7F9FC] dark:bg-slate-950">
+    <>
+    <div className="flex flex-col px-5 pt-6 pb-6 bg-hivio-bg dark:bg-hivio-bg-dark">
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -716,7 +802,7 @@ function Dashboard({ user, onTabChange }) {
                 className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-950 shadow-sm"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-[#2C6E91] flex items-center justify-center text-white font-bold text-sm shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-hivio-primary flex items-center justify-center text-hivio-text-inverse font-bold text-sm shadow-sm">
                 {(user.name || 'U')?.charAt(0).toUpperCase()}
               </div>
             )}
@@ -730,74 +816,51 @@ function Dashboard({ user, onTabChange }) {
             </div>
           </div>
 
-          {counts.total > 0 && (
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                type="button"
-                onClick={exportCSV}
-                title="Export data as CSV"
-                className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-[#2C6E91] transition-colors"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={exportPDF}
-                title="Save report as PDF"
-                className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-[#2C6E91] transition-colors"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-                </svg>
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="rounded-3xl p-5 mb-4 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_4px_16px_rgba(0,0,0,0.10)]">
+      <div className="rounded-xl p-5 mb-4 border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark shadow-hivio-md">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">Application Snapshot</p>
             <div className="flex items-baseline gap-2 mt-2">
               <p className="text-3xl leading-none font-black text-slate-900 dark:text-slate-100">{counts.total}</p>
-              {thisWeekCount > 0 && (
+              {velocityDelta !== 0 && (
                 <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-lg ${
                   velocityDelta > 0
-                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                    : velocityDelta < 0
-                    ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    ? 'bg-[#ecfdf5] text-[#166534] dark:bg-[#1e3a2f] dark:text-white'
+                    : 'bg-[#eef1f8] text-[#5a6a8a] dark:bg-[#1a2535] dark:text-white'
                 }`}>
-                  {velocityDelta > 0 ? '+' : ''}{velocityDelta !== 0 ? velocityDelta : '='} this week
+                  {velocityDelta > 0 ? '+' : ''}{velocityDelta} this week
                 </span>
               )}
             </div>
-            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mt-1">Active applications</p>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mt-1">Total applications</p>
           </div>
           <button
             type="button"
             onClick={() => navigateToApplicationsWithStatus('All')}
-            className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-300/70 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-900 transition-colors"
+            className="px-3 py-2 rounded-md text-xs font-medium border border-hivio-border dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
           >
-            Open Applications
+            Open →
           </button>
         </div>
 
         <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3">
-            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Applied</p>
-            <p className="text-lg font-black text-[#2C6E91]">{appliedCount}</p>
-          </div>
-          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3">
-            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Interview Rate</p>
+          <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
+            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Interview</p>
             <p className="text-lg font-black text-teal-700 dark:text-teal-300">{interviewRate}%</p>
           </div>
-          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3">
-            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Offer Rate</p>
-            <p className="text-lg font-black text-amber-700 dark:text-amber-300">{offerRate}%</p>
+          <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
+            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Offers</p>
+            <p className="text-lg font-black text-amber-700 dark:text-amber-300">{offerCount}</p>
+          </div>
+          <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
+            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">This Week</p>
+            <p className="text-lg font-black text-hivio-primary">
+              {thisWeekCount}
+              <span className="text-[11px] font-semibold text-slate-400"> / {weeklyGoalTarget}</span>
+            </p>
           </div>
         </div>
       </div>
@@ -805,7 +868,7 @@ function Dashboard({ user, onTabChange }) {
       {dashboardOrder.map((widgetId) => {
         if (widgetId === 'statusBreakdown' && widgets.statusBreakdown) {
           return (
-            <div key="statusBreakdown" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="statusBreakdown" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
@@ -820,14 +883,14 @@ function Dashboard({ user, onTabChange }) {
                 total={counts.total}
                 onSelect={navigateToApplicationsWithStatus}
                 items={[
-                  { id: 'Applied', label: 'Applied', value: appliedCount, color: '#2C6E91' },
+                  { id: 'Applied', label: 'Applied', value: appliedCount, color: '#6366F1' },
                   { id: 'Interview', label: 'Interview', value: interviewCount, color: '#0F766E' },
                   { id: 'Offer', label: 'Offer', value: offerCount, color: '#D97706' },
                   { id: 'Rejected', label: 'Rejected', value: rejectedCount, color: '#64748B' },
                 ]}
               />
               {staleApps.length > 0 && staleApps.some((a) => !dismissedStaleIds.includes(a.id)) && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/25">
+                <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-md bg-hivio-status-interview-bg border border-hivio-status-interview/20">
                   <button
                     type="button"
                     onClick={() => navigateToApplicationsWithStatus('Applied')}
@@ -863,7 +926,7 @@ function Dashboard({ user, onTabChange }) {
 
         if (widgetId === 'applicationFunnel' && widgets.applicationFunnel) {
           return (
-            <div key="applicationFunnel" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="applicationFunnel" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
                   <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
@@ -873,23 +936,26 @@ function Dashboard({ user, onTabChange }) {
                     Ratio from applied to interview to offer.
                   </p>
                 </div>
-                <div className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50 dark:bg-slate-800/60">
+                <div className="rounded-md border border-hivio-border dark:border-hivio-border-dark px-3 py-2 bg-hivio-bg dark:bg-hivio-bg-dark">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Interviews Landed</p>
                   <p className="text-lg font-black text-teal-700 dark:text-teal-300 leading-none mt-1">{interviewsLanded}</p>
                 </div>
               </div>
               <ApplicationFunnel
-                applied={Math.max(1, appliedCount)}
-                interview={interviewCount}
+                total={counts.total}
+                interviewed={interviewsLanded}
                 offer={offerCount}
+                rejected={rejectedCount}
                 onSelect={navigateToApplicationsWithStatus}
               />
               {counts.total >= 5 && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className={`text-xs font-bold ${interviewRate >= 20 ? 'text-teal-600 dark:text-teal-300' : interviewRate >= 10 ? 'text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-300'}`}>
-                    {interviewRate >= 20 ? 'Above average' : interviewRate >= 10 ? 'Near average' : 'Below average'}
+                <div className="mt-3 px-3 py-2 rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark">
+                  <span className={`text-xs font-bold block ${interviewRate >= 8 ? 'text-teal-600 dark:text-teal-300' : interviewRate >= 4 ? 'text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-300'}`}>
+                    {interviewRate >= 8 ? 'Above average interview rate' : interviewRate >= 4 ? 'Near average interview rate' : 'Below average interview rate'}
                   </span>
-                  <span className="text-[10px] text-slate-400">Typical interview rate is 10–20%</span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                    {interviewRate >= 8 ? 'You\'re outperforming the typical 3–5% new-grad rate.' : interviewRate >= 4 ? 'Typical new-grad rate is 3–5% — you\'re close.' : 'Typical new-grad rate is 3–5% — focus on tailoring.'}
+                  </span>
                 </div>
               )}
             </div>
@@ -898,18 +964,18 @@ function Dashboard({ user, onTabChange }) {
 
         if (widgetId === 'weeklyActivity' && widgets.weeklyActivity) {
           return (
-            <div key="weeklyActivity" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="weeklyActivity" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
                     Weekly Activity
                   </h2>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-slate-400">{thisWeekCount} apps this week</p>
+                    <p className="text-xs text-slate-400">{thisWeekCount} applications this week</p>
                     {lastWeekCount > 0 && (
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                        velocityDelta > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-                        : velocityDelta < 0 ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-300'
+                        velocityDelta > 0 ? 'bg-[#ecfdf5] text-[#166534] dark:bg-[#1e3a2f] dark:text-white'
+                        : velocityDelta < 0 ? 'bg-[#eef1f8] text-[#5a6a8a] dark:bg-[#1a2535] dark:text-white'
                         : 'text-slate-400'
                       }`}>
                         {velocityDelta > 0 ? '+' : ''}{velocityDelta} vs last week
@@ -918,9 +984,9 @@ function Dashboard({ user, onTabChange }) {
                   </div>
                 </div>
               </div>
-              <ActivityLineChart days={last7} values={activityValues} />
+              <ActivityBarChart days={last7} values={activityValues} />
               {activityValues.reduce((a, b) => a + b, 0) === 0 && (
-                <p className="text-xs text-slate-400 mt-3 text-center">
+                <p className="text-xs text-slate-400 mt-2 text-center">
                   No activity yet — start applying!
                 </p>
               )}
@@ -928,115 +994,153 @@ function Dashboard({ user, onTabChange }) {
           );
         }
 
-        if (widgetId === 'resumePerformance' && widgets.applicationFunnel) {
+        if (widgetId === 'resumePerformance' && widgets.resumePerformance) {
+          const ratingColor = {
+            strong: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10',
+            mixed: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10',
+            low: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10',
+          };
+          const ratingLabel = { strong: 'Strong', mixed: 'Mixed', low: 'Needs work' };
+
           return (
-            <div key="resumePerformance" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="resumePerformance" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="mb-3">
                 <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
-                  Resume Performance Insights
+                  Resume Performance
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Compare resume outcomes across interviews, offers, and rejections.
-                </p>
+                <p className="text-xs text-slate-400 mt-0.5">Tap a resume to see feedback and guidance.</p>
               </div>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Outcome Graph</p>
-                  {resumeStats.length === 0 ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-300">No resume-linked apps yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {resumeStats.slice(0, 3).map((r) => (
-                        <div key={r.resumeId} className="rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
-                          <div className="flex items-center gap-3">
-                            <ResumeOutcomeDonut data={r} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{r.label}</p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-300 mt-0.5">
-                                {r.applications} apps • {formatPct(r.interviewRate)} interview rate
-                              </p>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300">Int {r.interviews}</span>
-                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300">Off {r.offers}</span>
-                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300">Rej {r.rejected}</span>
-                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-[#2C6E91]">App {r.applied}</span>
-                              </div>
+
+              {resumeStats.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-300">No resume-linked apps yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {resumeStats.map((r) => {
+                    const { rating } = getResumeDetail(r, activeApps.filter((a) => a.resumeId === r.resumeId));
+                    return (
+                      <button
+                        key={r.resumeId}
+                        type="button"
+                        onClick={() => setResumeDetailId(r.resumeId)}
+                        className="w-full text-left rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 hover:border-hivio-border-focus transition-colors duration-150"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <ResumeOutcomeDonut data={r} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 leading-tight mb-0.5">{r.label}</p>
+                            <p className="text-[11px] font-medium">
+                              <span className={ratingColor[rating]}>{ratingLabel[rating]}</span>
+                              <span className="text-slate-400"> • {formatPct(r.interviewRate)} int. rate</span>
+                            </p>
+                            <div className="grid grid-cols-3 mt-2">
+                              {[
+                                { label: 'Interviews', val: r.interviews, numCls: 'text-teal-600 dark:text-teal-400' },
+                                { label: 'Offers', val: r.offers, numCls: 'text-amber-500 dark:text-amber-400' },
+                                { label: 'Rejected', val: r.rejected, numCls: 'text-rose-500 dark:text-rose-400' },
+                              ].map(({ label, val, numCls }) => (
+                                <div key={label} className="flex flex-col items-center">
+                                  <p className={`text-sm font-bold leading-tight ${numCls}`}>{val}</p>
+                                  <p className="text-[9px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">{label}</p>
+                                </div>
+                              ))}
                             </div>
                           </div>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-slate-400">
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </button>
+                    );
+                  })}
                 </div>
-                {resumeFeedback.length > 0 && (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Feedback</p>
-                    <div className="space-y-2">
-                      {resumeFeedback.map((text) => (
-                        <div key={text} className="rounded-xl border border-slate-300 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-950">
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Resume guidance</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-300 mt-1">{text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           );
         }
 
         if (widgetId === 'upcomingTasks' && widgets.upcomingTasks) {
+          const hasAny = overdueFollowups.length > 0 || upcomingFollowups.length > 0;
           return (
-            <div key="upcomingTasks" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="upcomingTasks" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                    Upcoming Follow-ups
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Next actions you've scheduled
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Follow-ups</h2>
+                    {overdueFollowups.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#3d2020] text-[#e87c7c]">
+                        {overdueFollowups.length} overdue
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">Scheduled actions across your applications</p>
                 </div>
                 <button
                   type="button"
                   onClick={navigateToApplicationsFollowUps}
-                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-3 py-2 rounded-md border border-hivio-border dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 whitespace-nowrap flex-shrink-0"
                 >
                   View all
                 </button>
               </div>
-              {upcomingFollowups.length === 0 ? (
+
+              {!hasAny ? (
                 <div className="flex flex-col items-center py-4 text-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-500 mb-2 border border-slate-200 dark:border-slate-700">
+                  <div className="w-10 h-10 rounded-full bg-hivio-bg dark:bg-hivio-bg-dark flex items-center justify-center text-hivio-text-muted dark:text-hivio-text-muted-dark mb-2 border border-hivio-border dark:border-hivio-border-dark">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                     </svg>
                   </div>
-                  <p className="text-xs text-slate-400 font-medium">No upcoming follow-ups yet.</p>
+                  <p className="text-xs text-slate-400 font-medium">No follow-ups scheduled yet.</p>
                   <p className="text-[11px] text-slate-400 mt-1">Add a follow-up date in an application to see it here.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {upcomingFollowups.map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex items-start justify-between gap-3 border border-slate-300 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-300 font-medium truncate mt-0.5">
-                          {a.company}{a.resumeId ? ` • ${resumeLabelById(a.resumeId)}` : ''}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{a.followUpDate}</p>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold mt-1 ${statusBadgeClasses(a.status)}`}>
-                          {a.status}
-                        </span>
+                <div className="space-y-4">
+                  {overdueFollowups.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-[#e87c7c] mb-1.5">Overdue</p>
+                      <div className="space-y-2">
+                        {overdueFollowups.map((a) => (
+                          <button key={a.id} type="button" onClick={() => navigateToApp(a.id)} className="w-full text-left flex items-start justify-between gap-3 border border-[#5a2a2a] rounded-md p-3 bg-[#2a1515] dark:bg-[#2a1515] hover:opacity-80 transition-opacity duration-150">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-100 truncate">{a.title}</p>
+                              <p className="text-xs text-slate-400 font-medium truncate mt-0.5">{a.company}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs font-semibold text-[#e87c7c]">{formatRelativeDate(a.followUpDate)}</p>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold mt-1 ${statusBadgeClasses(a.status)}`}>
+                                {a.status}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+                  {upcomingFollowups.length > 0 && (
+                    <div>
+                      {overdueFollowups.length > 0 && (
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Upcoming</p>
+                      )}
+                      <div className="space-y-2">
+                        {upcomingFollowups.map((a) => (
+                          <button key={a.id} type="button" onClick={() => navigateToApp(a.id)} className="w-full text-left flex items-start justify-between gap-3 border border-hivio-border dark:border-hivio-border-dark rounded-md p-3 bg-hivio-bg dark:bg-hivio-bg-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-300 font-medium truncate mt-0.5">
+                                {a.company}{a.resumeId ? ` • ${resumeLabelById(a.resumeId)}` : ''}
+                              </p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRelativeDate(a.followUpDate)}</p>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold mt-1 ${statusBadgeClasses(a.status)}`}>
+                                {a.status}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1045,7 +1149,7 @@ function Dashboard({ user, onTabChange }) {
 
         if (widgetId === 'recentApps' && widgets.recentApps) {
           return (
-            <div key="recentApps" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="recentApps" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Recent Applications</h2>
@@ -1057,14 +1161,14 @@ function Dashboard({ user, onTabChange }) {
                     try { localStorage.setItem(intentKey, JSON.stringify({ status: 'All' })); } catch {}
                     if (typeof onTabChange === 'function') onTabChange('applications');
                   }}
-                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-3 py-2 rounded-md border border-hivio-border dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark text-xs font-medium hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
                 >
                   Open
                 </button>
               </div>
               {recentApps.length === 0 ? (
                 <div className="flex flex-col items-center py-4 text-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-500 mb-2 border border-slate-200 dark:border-slate-700">
+                  <div className="w-10 h-10 rounded-full bg-hivio-bg dark:bg-hivio-bg-dark flex items-center justify-center text-hivio-text-muted dark:text-hivio-text-muted-dark mb-2 border border-hivio-border dark:border-hivio-border-dark">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                     </svg>
@@ -1074,9 +1178,11 @@ function Dashboard({ user, onTabChange }) {
               ) : (
                 <div className="space-y-2">
                   {recentApps.map((a) => (
-                    <div
+                    <button
                       key={a.id}
-                      className="flex items-start justify-between gap-3 border border-slate-300 dark:border-slate-800 rounded-xl p-3"
+                      type="button"
+                      onClick={() => navigateToApp(a.id)}
+                      className="w-full text-left flex items-start justify-between gap-3 border border-hivio-border dark:border-hivio-border-dark rounded-md p-3 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
@@ -1088,9 +1194,9 @@ function Dashboard({ user, onTabChange }) {
                         <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold ${statusBadgeClasses(a.status)}`}>
                           {a.status}
                         </span>
-                        <p className="text-[11px] text-slate-400 font-medium mt-1">{a.date}</p>
+                        <p className="text-[11px] text-slate-400 font-medium mt-1">{formatRelativeDate(a.date)}</p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1101,10 +1207,21 @@ function Dashboard({ user, onTabChange }) {
         if (widgetId === 'pipelineHealth' && widgets.pipelineHealth) {
           const isEmpty = counts.total < 3;
           return (
-            <div key="pipelineHealth" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
-              <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase mb-3">
-                Pipeline Health
-              </h2>
+            <div key="pipelineHealth" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">Pipeline Health</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowHealthInfo((p) => !p)}
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-black transition-colors duration-150 ${showHealthInfo ? 'border-hivio-primary text-hivio-primary' : 'border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 hover:border-hivio-primary hover:text-hivio-primary'}`}
+                >?</button>
+              </div>
+              {showHealthInfo && (
+                <div className="mb-3 rounded-lg border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark p-3">
+                  <p className="text-[11px] font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1">How is this calculated?</p>
+                  <p className="text-[11px] text-hivio-text-secondary dark:text-hivio-text-secondary-dark leading-relaxed">Score is based on 3 factors: <strong>Activity</strong> (apps this week), <strong>Conversion</strong> (interview rate), and <strong>Active Tracking</strong> (% of active apps with a scheduled follow-up).</p>
+                </div>
+              )}
               {isEmpty ? (
                 <p className="text-xs text-slate-400">Add at least 3 applications to see your health score.</p>
               ) : (
@@ -1117,11 +1234,11 @@ function Dashboard({ user, onTabChange }) {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <HealthBar label="Activity" score={healthActivity} max={35} color="#2C6E91"
-                      detail={`${thisWeekCount} of ${WEEKLY_GOAL} apps this week`} />
+                    <HealthBar label="Activity" score={healthActivity} max={35} color="#6366F1"
+                      detail={`${thisWeekCount} of ${weeklyGoalTarget} apps this week`} />
                     <HealthBar label="Conversion" score={healthConversion} max={35} color="#0F766E"
                       detail={`${interviewRate}% interview rate`} />
-                    <HealthBar label="Follow-up Coverage" score={healthCoverage} max={30} color="#D97706"
+                    <HealthBar label="Active Tracking" score={healthCoverage} max={30} color="#D97706"
                       detail={`${Math.round(followUpCoverage * 100)}% of active apps covered`} />
                   </div>
                 </>
@@ -1131,12 +1248,12 @@ function Dashboard({ user, onTabChange }) {
         }
 
         if (widgetId === 'weeklyGoal' && widgets.weeklyGoal) {
-          const overGoal = Math.max(0, thisWeekCount - WEEKLY_GOAL);
-          const dots = WEEKLY_GOAL;
-          const filled = Math.min(thisWeekCount, WEEKLY_GOAL);
-          const pct = Math.min(100, Math.round((thisWeekCount / WEEKLY_GOAL) * 100));
+          const overGoal = Math.max(0, thisWeekCount - weeklyGoalTarget);
+          const dots = weeklyGoalTarget;
+          const filled = Math.min(thisWeekCount, weeklyGoalTarget);
+          const pct = Math.min(100, Math.round((thisWeekCount / weeklyGoalTarget) * 100));
           return (
-            <div key="weeklyGoal" className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] border border-slate-300 dark:border-slate-800 mb-4">
+            <div key="weeklyGoal" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">Weekly Goal</h2>
@@ -1146,7 +1263,7 @@ function Dashboard({ user, onTabChange }) {
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-black text-slate-900 dark:text-slate-100">{thisWeekCount}</span>
-                  <span className="text-sm font-semibold text-slate-400"> / {WEEKLY_GOAL}</span>
+                  <span className="text-sm font-semibold text-slate-400"> / {weeklyGoalTarget}</span>
                   {overGoal > 0 && (
                     <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-300">+{overGoal} over goal!</p>
                   )}
@@ -1157,7 +1274,7 @@ function Dashboard({ user, onTabChange }) {
                   <div
                     key={i}
                     className={`flex-1 h-2.5 rounded-full transition-all ${i < filled ? '' : 'bg-slate-100 dark:bg-slate-800'}`}
-                    style={i < filled ? { backgroundColor: '#2C6E91' } : undefined}
+                    style={i < filled ? { backgroundColor: '#6366F1' } : undefined}
                   />
                 ))}
               </div>
@@ -1177,6 +1294,98 @@ function Dashboard({ user, onTabChange }) {
       })}
 
     </div>
+
+    {resumeDetail && (() => {
+      const frameEl = document.getElementById('phone-frame');
+      if (!frameEl) return null;
+      const { rating, tips } = getResumeDetail(resumeDetail, activeApps.filter((a) => a.resumeId === resumeDetail.resumeId));
+      const sheetRatingColor = {
+        strong: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10',
+        mixed: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10',
+        low: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10',
+      };
+      const sheetRatingLabel = { strong: 'Strong', mixed: 'Mixed', low: 'Needs work' };
+      return createPortal(
+        <div
+          className="absolute inset-0 z-50 flex flex-col justify-end"
+          style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={() => setResumeDetailId(null)}
+        >
+          <div
+            className="bg-hivio-bg dark:bg-hivio-bg-dark rounded-t-2xl overflow-y-auto scrollbar-hide"
+            style={{ maxHeight: '82%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+            </div>
+
+            <div className="px-5 pb-8 pt-2">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark leading-snug">{resumeDetail.label}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sheetRatingColor[rating]}`}>{sheetRatingLabel[rating]}</span>
+                    <span className="text-[11px] text-hivio-text-muted dark:text-hivio-text-muted-dark">Resume Review</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResumeDetailId(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-md text-hivio-text-muted dark:text-hivio-text-muted-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors flex-shrink-0"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {[
+                  { label: 'Applied', val: resumeDetail.applied, cls: 'bg-hivio-status-applied-bg text-hivio-status-applied dark:bg-hivio-status-applied-bg-dark dark:text-white' },
+                  { label: 'Interview', val: resumeDetail.interviews, cls: 'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300' },
+                  { label: 'Offer', val: resumeDetail.offers, cls: 'bg-hivio-status-offer-bg text-hivio-status-offer dark:bg-hivio-status-offer-bg-dark dark:text-white' },
+                  { label: 'Rejected', val: resumeDetail.rejected, cls: 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300' },
+                ].map(({ label, val, cls }) => (
+                  <div key={label} className={`rounded-lg p-2.5 text-center ${cls}`}>
+                    <p className="text-base font-bold">{val}</p>
+                    <p className="text-[9px] font-semibold opacity-80 leading-tight mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Rate row */}
+              <div className="flex gap-2 mb-5">
+                <div className="flex-1 rounded-lg border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark p-3 text-center shadow-hivio-sm">
+                  <p className="text-base font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark">{formatPct(resumeDetail.interviewRate)}</p>
+                  <p className="text-[10px] text-hivio-text-muted dark:text-hivio-text-muted-dark font-semibold">Interview rate</p>
+                </div>
+                <div className="flex-1 rounded-lg border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark p-3 text-center shadow-hivio-sm">
+                  <p className="text-base font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark">{formatPct(resumeDetail.offerRate)}</p>
+                  <p className="text-[10px] text-hivio-text-muted dark:text-hivio-text-muted-dark font-semibold">Offer rate</p>
+                </div>
+              </div>
+
+              {/* Guidance */}
+              <p className="text-[11px] font-bold uppercase tracking-wide text-hivio-text-muted dark:text-hivio-text-muted-dark mb-2">Guidance</p>
+              <div className="space-y-2">
+                {tips.map((tip) => (
+                  <div key={tip.label} className="rounded-xl border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-surface dark:bg-hivio-surface-dark p-4 shadow-hivio-sm">
+                    <p className="text-xs font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark">{tip.label}</p>
+                    <p className="text-[11px] text-hivio-text-secondary dark:text-hivio-text-secondary-dark mt-1 leading-relaxed">{tip.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>,
+        frameEl
+      );
+    })()}
+    </>
   );
 }
 
