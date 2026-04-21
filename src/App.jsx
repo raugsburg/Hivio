@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, firebaseConfigError } from './firebase';
 import { getUserProfile, subscribeApplications, subscribeReminders } from './utils/db';
 
 import PhoneFrame from './components/PhoneFrame';
@@ -49,6 +49,12 @@ function App() {
 
   // ── Firebase Auth state listener ─────────────────────────────────────────────
   useEffect(() => {
+    if (firebaseConfigError || !auth) {
+      setCurrentUser(null);
+      setScreen('configError');
+      return;
+    }
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         setCurrentUser(null);
@@ -215,6 +221,38 @@ function App() {
             }} />
             <p style={{ color: 'var(--text-3)', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
               Loading…
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (screen === 'configError') {
+      return (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          padding: '24px',
+          background: 'var(--bg-app)',
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: 320,
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            padding: '16px',
+            background: 'var(--bg-card)',
+          }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 8 }}>
+              App configuration is incomplete
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
+              This environment is missing Firebase settings.
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
+              {firebaseConfigError || 'Check your VITE_FIREBASE_* variables in .env.local.'}
             </p>
           </div>
         </div>

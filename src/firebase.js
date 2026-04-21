@@ -11,7 +11,28 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+const requiredConfigKeys = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+];
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+const missingConfigKeys = requiredConfigKeys.filter((key) => !firebaseConfig[key]);
+
+export const firebaseConfigError = missingConfigKeys.length
+  ? `Missing Firebase environment variables: ${missingConfigKeys
+      .map((key) => `VITE_FIREBASE_${key.replace(/[A-Z]/g, (m) => `_${m}`).toUpperCase()}`)
+      .join(', ')}`
+  : null;
+
+let app = null;
+
+if (!firebaseConfigError) {
+  app = initializeApp(firebaseConfig);
+}
+
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
