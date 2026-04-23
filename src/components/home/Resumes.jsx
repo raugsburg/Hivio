@@ -232,11 +232,12 @@ function Resumes({ user }) {
   const inputBase =
     'w-full text-sm font-normal text-hivio-text-primary dark:text-hivio-text-primary-dark bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark rounded-sm px-3 py-2 shadow-hivio-sm placeholder:text-hivio-text-muted dark:placeholder:text-hivio-text-muted-dark focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150 ease-in-out';
 
-  const filteredResumes = searchQuery.trim()
+  const filteredResumes = (searchQuery.trim()
     ? resumes.filter((r) =>
         (r.label || r.fileName || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : resumes;
+    : resumes
+  ).slice().sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
 
   // ── Viewer view ──────────────────────────────────────────────────────────────
   if (viewingResume) {

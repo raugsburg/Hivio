@@ -57,8 +57,8 @@ function formatTimeLabel(time) {
 function nextHourTime() {
   const d = new Date();
   d.setMinutes(0, 0, 0);
-  d.setHours(d.getHours() + 1);
-  return `${String(d.getHours()).padStart(2, '0')}:00`;
+  const next = (d.getHours() + 1) % 24;
+  return `${String(next).padStart(2, '0')}:00`;
 }
 
 function Calendar({ user, onNotify, onSchedule }) {
@@ -205,7 +205,7 @@ function Calendar({ user, onNotify, onSchedule }) {
       }
 
       setShowForm(false);
-      setForm({ title: '', date: selectedDate, time: nextHourTime(), notes: '' });
+      setForm({ title: '', date: form.date, time: nextHourTime(), notes: '' });
     } catch {
       setError('Save failed. Please check your connection and try again.');
     } finally {

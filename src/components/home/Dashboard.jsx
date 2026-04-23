@@ -17,6 +17,8 @@ function statusBadgeClasses(status) {
       return 'bg-hivio-status-offer-bg text-hivio-status-offer border border-hivio-status-offer/20 dark:bg-hivio-status-offer-bg-dark dark:text-white dark:border-hivio-status-offer-dark/20';
     case 'Rejected':
       return 'bg-hivio-status-rejected-bg text-hivio-status-rejected border border-hivio-status-rejected/20 dark:bg-hivio-status-rejected-bg-dark dark:text-white dark:border-hivio-status-rejected-dark/20';
+    case 'No Response':
+      return 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
     default:
       return 'bg-hivio-status-ghosted-bg text-hivio-status-ghosted border border-hivio-status-ghosted/20';
   }
@@ -120,8 +122,8 @@ function StatusDistribution({ total, items, onSelect }) {
 function ApplicationFunnel({ total, interviewed, offer, rejected, onSelect }) {
   const rows = [
     { id: 'All', label: 'Total Applied', value: total, color: '#6366F1' },
-    { id: 'Interview', label: 'Got Interview', value: interviewed, color: '#0F766E' },
-    { id: 'Offer', label: 'Got Offer', value: offer, color: '#D97706' },
+    { id: 'Interview', label: 'Interview', value: interviewed, color: '#0F766E' },
+    { id: 'Offer', label: 'Offer', value: offer, color: '#D97706' },
     { id: 'Rejected', label: 'Rejected', value: rejected, color: '#ef4444' },
   ];
   // Scale all bars relative to total so proportions are honest
@@ -132,26 +134,18 @@ function ApplicationFunnel({ total, interviewed, offer, rejected, onSelect }) {
       {rows.map((r, i) => {
         const pct = Math.round((r.value / max) * 100);
         const prev = rows[i - 1];
-        const convRate = r.id === 'Rejected'
-          ? (total > 0 ? Math.round((r.value / total) * 100) : null)
-          : (prev && prev.value > 0 ? Math.round((r.value / prev.value) * 100) : null);
+        const convRate = (r.id !== 'All' && total > 0)
+          ? Math.round((r.value / total) * 100)
+          : null;
         const connectorLabels = {
-          Interview: `${convRate}% got interviews`,
-          Offer: `${convRate}% got offers`,
-          Rejected: `${convRate}% of total rejected`,
+          Interview: `${convRate}% of applications got an interview`,
+          Offer: `${convRate}% of applications got an offer`,
+          Rejected: `${convRate}% of applications were rejected`,
         };
         const connectorLabel = connectorLabels[r.id] || `${convRate}%`;
 
         return (
           <div key={r.id}>
-            {convRate !== null && (
-              <div className="flex items-center gap-1.5 px-1 py-1.5">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600 flex-shrink-0">
-                  <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
-                </svg>
-                <span className="text-[10px] font-semibold text-slate-400">{connectorLabel}</span>
-              </div>
-            )}
             <button
               type="button"
               onClick={() => onSelect(r.id)}
@@ -170,6 +164,9 @@ function ApplicationFunnel({ total, interviewed, offer, rejected, onSelect }) {
                   style={{ width: `${r.value > 0 ? Math.max(pct, 3) : 0}%`, backgroundColor: r.color }}
                 />
               </div>
+              {convRate !== null && (
+                <p className="text-[10px] font-semibold text-slate-400 mt-1.5">{connectorLabel}</p>
+              )}
             </button>
           </div>
         );
@@ -406,6 +403,8 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
     healthActivity,
     healthConversion,
     healthCoverage,
+    ghostCount,
+    ghostPenalty,
     rollingWeeklyAvg,
   } = useMemo(() => {
     const now = new Date();
@@ -440,7 +439,7 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
     const activityByDay = Object.fromEntries(last7Keys.map((k) => [k, 0]));
 
     activeApps.forEach((a) => {
-      const raw = a.createdAt || a.date;
+      const raw = a.date || a.createdAt;
       if (!raw) return;
       const key = startOfDayISO(raw);
       if (activityByDay[key] !== undefined) activityByDay[key] += 1;
@@ -548,14 +547,20 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
         ? appsNeedingCoverage.filter((a) => a.followUpDate).length / appsNeedingCoverage.length
         : 0;
 
-    // Health score (0–100): activity 35 + conversion 35 + follow-up coverage 30
-    // Activity: based on 4-week rolling average vs user's weekly goal
-    const healthActivity = Math.min(35, Math.round((rollingWeeklyAvg / weeklyGoalTarget) * 35));
+    // Health score (0–100): conversion 40 + activity 30 + follow-up discipline 30, minus ghost penalty (up to -20)
+    const healthActivity = Math.min(30, Math.round((rollingWeeklyAvg / weeklyGoalTarget) * 30));
     // Conversion: 8% interview rate = full score (new-grad benchmark: typical is 3–5%, strong is 8%+)
     const healthConversion =
-      counts.total >= 3 ? Math.min(35, Math.round((interviewRate / 8) * 35)) : 0;
+      counts.total >= 3 ? Math.min(40, Math.round((interviewRate / 8) * 40)) : 0;
     const healthCoverage = Math.round(followUpCoverage * 30);
-    const healthScore = healthActivity + healthConversion + healthCoverage;
+    // Ghost penalty: -3 per Applied app older than 21 days with no follow-up date, capped at -20
+    const ghostCount = activeApps.filter((a) => {
+      if (a.status !== 'Applied' || a.followUpDate) return false;
+      const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
+      return ageDays > 21;
+    }).length;
+    const ghostPenalty = Math.min(20, ghostCount * 3);
+    const healthScore = Math.max(0, healthActivity + healthConversion + healthCoverage - ghostPenalty);
     const healthLabel =
       healthScore >= 80 ? 'Strong' : healthScore >= 60 ? 'Active' : healthScore >= 40 ? 'Slow' : 'Stalled';
     const healthColor =
@@ -589,6 +594,8 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
       healthActivity,
       healthConversion,
       healthCoverage,
+      ghostCount,
+      ghostPenalty,
       rollingWeeklyAvg,
     };
   }, [apps, resumes, weeklyGoalTarget]);
@@ -779,9 +786,14 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
   function navigateToApplicationsFollowUps() {
     try {
       localStorage.setItem(intentKey, JSON.stringify({ filter: 'followups' }));
-    } catch {
-      // ignore
-    }
+    } catch {}
+    if (typeof onTabChange === 'function') onTabChange('applications');
+  }
+
+  function navigateToGhostApps() {
+    try {
+      localStorage.setItem(intentKey, JSON.stringify({ filter: 'ghost' }));
+    } catch {}
     if (typeof onTabChange === 'function') onTabChange('applications');
   }
 
@@ -943,7 +955,7 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
               </div>
               <ApplicationFunnel
                 total={counts.total}
-                interviewed={interviewsLanded}
+                interviewed={interviewCount}
                 offer={offerCount}
                 rejected={rejectedCount}
                 onSelect={navigateToApplicationsWithStatus}
@@ -1215,11 +1227,20 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                   onClick={() => setShowHealthInfo((p) => !p)}
                   className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-black transition-colors duration-150 ${showHealthInfo ? 'border-hivio-primary text-hivio-primary' : 'border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 hover:border-hivio-primary hover:text-hivio-primary'}`}
                 >?</button>
+                {ghostPenalty > 0 && (
+                  <button
+                    type="button"
+                    onClick={navigateToGhostApps}
+                    className="ml-auto text-[10px] font-semibold text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-2 py-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900 transition-colors duration-150"
+                  >
+                    -{ghostPenalty} pts · {ghostCount} ghost app{ghostCount !== 1 ? 's' : ''}
+                  </button>
+                )}
               </div>
               {showHealthInfo && (
                 <div className="mb-3 rounded-lg border border-[#C4CDD6] dark:border-hivio-border-dark bg-hivio-bg dark:bg-hivio-bg-dark p-3">
                   <p className="text-[11px] font-semibold text-hivio-text-primary dark:text-hivio-text-primary-dark mb-1">How is this calculated?</p>
-                  <p className="text-[11px] text-hivio-text-secondary dark:text-hivio-text-secondary-dark leading-relaxed">Score is based on 3 factors: <strong>Activity</strong> (apps this week), <strong>Conversion</strong> (interview rate), and <strong>Active Tracking</strong> (% of active apps with a scheduled follow-up).</p>
+                  <p className="text-[11px] text-hivio-text-secondary dark:text-hivio-text-secondary-dark leading-relaxed">Score is based on 3 factors: <strong>Conversion</strong> (interview rate, 40pts), <strong>Activity</strong> (4-week rolling average vs your goal, 30pts), and <strong>Follow-up Discipline</strong> (% of active apps with a scheduled follow-up, 30pts). Ghost apps (Applied with no response after 21 days) subtract up to 20pts.</p>
                 </div>
               )}
               {isEmpty ? (
@@ -1234,11 +1255,11 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <HealthBar label="Activity" score={healthActivity} max={35} color="#6366F1"
-                      detail={`${thisWeekCount} of ${weeklyGoalTarget} apps this week`} />
-                    <HealthBar label="Conversion" score={healthConversion} max={35} color="#0F766E"
+                    <HealthBar label="Activity" score={healthActivity} max={30} color="#6366F1"
+                      detail={`${rollingWeeklyAvg.toFixed(1)} avg/week · goal ${weeklyGoalTarget}`} />
+                    <HealthBar label="Conversion" score={interviewRate} max={100} color="#0F766E"
                       detail={`${interviewRate}% interview rate`} />
-                    <HealthBar label="Active Tracking" score={healthCoverage} max={30} color="#D97706"
+                    <HealthBar label="Follow-up Discipline" score={healthCoverage} max={30} color="#D97706"
                       detail={`${Math.round(followUpCoverage * 100)}% of active apps covered`} />
                   </div>
                 </>

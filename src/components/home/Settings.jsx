@@ -706,25 +706,46 @@ ${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Ap
           </div>
         )}
 
-        <div className={`${card} mb-4 p-4`}>
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Weekly Application Goal</p>
+        <div className={`${card} mb-3 p-4`}>
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Applications per week</p>
           <p className="text-xs text-slate-400 mb-3">
             Used to score your activity in Pipeline Health.
           </p>
           <div className="flex items-center gap-3">
-            <input
-              type="number"
-              min="1"
-              max="50"
-              value={form.weeklyGoalTarget}
-              onChange={(e) => setForm((prev) => ({ ...prev, weeklyGoalTarget: e.target.value }))}
-              onBlur={(e) => {
-                const n = Math.max(1, Math.min(50, Number(e.target.value) || 5));
-                setForm((prev) => ({ ...prev, weeklyGoalTarget: n }));
-              }}
-              className="w-20 bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-primary dark:text-hivio-text-primary-dark rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-hivio-border-focus focus:border-hivio-border-focus transition-all duration-150"
-            />
-            <span className="text-xs text-slate-400 font-medium">apps per week</span>
+            <div className="flex items-center border border-[#C4CDD6] dark:border-hivio-border-dark rounded-md overflow-hidden bg-hivio-surface dark:bg-hivio-surface-dark">
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={form.weeklyGoalTarget}
+                onChange={(e) => setForm((prev) => ({ ...prev, weeklyGoalTarget: e.target.value }))}
+                onBlur={(e) => {
+                  const n = Math.max(1, Math.min(50, Number(e.target.value) || 5));
+                  setForm((prev) => ({ ...prev, weeklyGoalTarget: n }));
+                }}
+                className="w-14 bg-transparent text-hivio-text-primary dark:text-hivio-text-primary-dark px-3 py-2 text-sm font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <div className="flex flex-col border-l border-[#C4CDD6] dark:border-hivio-border-dark">
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, weeklyGoalTarget: Math.min(50, Number(prev.weeklyGoalTarget) + 1) }))}
+                  className="px-2 py-1 text-slate-400 hover:text-hivio-text-primary dark:hover:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, weeklyGoalTarget: Math.max(1, Number(prev.weeklyGoalTarget) - 1) }))}
+                  className="px-2 py-1 border-t border-[#C4CDD6] dark:border-hivio-border-dark text-slate-400 hover:text-hivio-text-primary dark:hover:text-hivio-text-primary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -877,7 +898,7 @@ ${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Ap
       <button
         type="button"
         onClick={() => setView('account')}
-        className={`${card} w-full flex items-center gap-4 mb-6 p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 text-left`}
+        className={`${card} w-full flex items-center gap-4 mb-4 p-4 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150 text-left`}
       >
         {user.avatarUrl ? (
           <img
@@ -904,7 +925,7 @@ ${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Ap
         </svg>
       </button>
 
-      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark divide-y divide-hivio-border dark:divide-hivio-border-dark mb-6">
+      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark divide-y divide-hivio-border dark:divide-hivio-border-dark mb-4">
         <button
           type="button"
           onClick={() => setView('dashboard')}
@@ -993,7 +1014,7 @@ ${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Ap
       <FeedbackCard user={user} />
 
       {/* Data & Export */}
-      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark p-4 mb-6">
+      <div className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark p-4 mb-4">
         <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Data &amp; Export</p>
         <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark mb-4">Download your application data</p>
         <div className="flex flex-col gap-3">

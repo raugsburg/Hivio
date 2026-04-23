@@ -13,7 +13,7 @@ function scrollAppContainerToTop() {
 }
 
 /* Constants */
-const STATUS_OPTIONS = ['Applied', 'Interview', 'Offer', 'Rejected'];
+const STATUS_OPTIONS = ['Applied', 'Interview', 'Offer', 'Rejected', 'No Response'];
 
 const FILTER_CHIPS = [
   { id: 'all', label: 'All' },
@@ -22,6 +22,8 @@ const FILTER_CHIPS = [
   { id: 'Offer', label: 'Offer' },
   { id: 'Rejected', label: 'Rejected' },
   { id: 'followups', label: 'Follow-ups' },
+  { id: 'No Response', label: 'No Response' },
+  { id: 'ghost', label: 'Ghost' },
 ];
 
 const AVATAR_COLORS = [
@@ -256,6 +258,8 @@ function Applications({ user, openAppId, onOpenAppIdConsumed }) {
         setActiveFilter('all');
       } else if (intent?.filter === 'followups') {
         setActiveFilter('followups');
+      } else if (intent?.filter === 'ghost') {
+        setActiveFilter('ghost');
       }
 
       localStorage.removeItem(intentKey);
@@ -673,6 +677,13 @@ function Applications({ user, openAppId, onOpenAppIdConsumed }) {
       list = [...list]
         .filter((a) => isValidDateStringYYYYMMDD(a.followUpDate))
         .sort((a, b) => (a.followUpDate || '').localeCompare(b.followUpDate || ''));
+    } else if (activeFilter === 'ghost') {
+      const now = Date.now();
+      list = list.filter((a) => {
+        if (a.status !== 'Applied' || a.followUpDate) return false;
+        const ageDays = (now - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
+        return ageDays > 21;
+      });
     } else if (activeFilter !== 'all') {
       list = list.filter((a) => (a.status || 'Applied') === activeFilter);
     }
@@ -1119,6 +1130,8 @@ function Applications({ user, openAppId, onOpenAppIdConsumed }) {
                         ? 'bg-hivio-status-interview-bg text-hivio-status-interview dark:bg-hivio-status-interview-bg-dark dark:text-white'
                         : a.status === 'Offer'
                         ? 'bg-hivio-status-offer-bg text-hivio-status-offer dark:bg-hivio-status-offer-bg-dark dark:text-white'
+                        : a.status === 'No Response'
+                        ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                         : 'bg-hivio-status-rejected-bg text-hivio-status-rejected dark:bg-hivio-status-rejected-bg-dark dark:text-white'
                     }`}>
                       {a.status}
