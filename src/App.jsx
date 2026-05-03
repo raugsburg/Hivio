@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, deleteUser } from 'firebase/auth';
 import { auth } from './firebase';
 import { getUserProfile, subscribeApplications, subscribeReminders } from './utils/db';
 
@@ -171,6 +171,15 @@ function App() {
     await signOut(auth);
   }
 
+  async function handleCancelSetup() {
+    try {
+      if (auth.currentUser) await deleteUser(auth.currentUser);
+    } catch {
+      await signOut(auth);
+    }
+    // onAuthStateChanged fires with null → screen = 'login'
+  }
+
   // ── Screens ───────────────────────────────────────────────────────────────────
 
   function renderActiveTab() {
@@ -222,7 +231,7 @@ function App() {
     }
 
     if (screen === 'profileSetup' && currentUser) {
-      return <ProfileSetup user={currentUser} onProfileComplete={handleProfileComplete} />;
+      return <ProfileSetup user={currentUser} onProfileComplete={handleProfileComplete} onCancel={handleCancelSetup} />;
     }
 
     if (screen === 'app' && currentUser) {

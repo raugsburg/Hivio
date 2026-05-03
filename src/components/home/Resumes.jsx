@@ -145,6 +145,11 @@ function Resumes({ user }) {
   async function handleDelete(resumeId) {
     try {
       await deleteResume(user.uid, resumeId);
+      // Clear orphaned links in any applications that referenced this resume
+      const linked = apps.filter((a) => !a.archived && a.resumeId === resumeId);
+      await Promise.all(
+        linked.map((a) => saveApplication(user.uid, { ...a, resumeId: '', updatedAt: new Date().toISOString() }))
+      );
     } catch {
       setError('Delete failed. Please try again.');
     }
@@ -322,12 +327,28 @@ function Resumes({ user }) {
   if (linkingResume) {
     const activeApps = apps.filter((a) => !a.archived);
     const filteredLinkApps = activeApps.filter((a) => {
-      const matchesFilter = linkFilter === 'all' || a.status === linkFilter;
+      let matchesFilter;
+      if (linkFilter === 'all') {
+        matchesFilter = true;
+      } else if (linkFilter === 'ghost') {
+        const ageDays = (Date.now() - new Date(a.createdAt || a.date || 0).getTime()) / 86400000;
+        matchesFilter = a.status === 'Applied' && !a.followUpDate && ageDays > 21;
+      } else {
+        matchesFilter = a.status === linkFilter;
+      }
       const q = linkSearch.trim().toLowerCase();
       const matchesSearch = !q || a.company?.toLowerCase().includes(q) || a.title?.toLowerCase().includes(q);
       return matchesFilter && matchesSearch;
     });
-    const STATUS_CHIPS = ['all', 'Applied', 'Interview', 'Offer', 'Rejected'];
+    const STATUS_CHIPS = [
+      { id: 'all', label: 'All' },
+      { id: 'Applied', label: 'Applied' },
+      { id: 'Interview', label: 'Interview' },
+      { id: 'Offer', label: 'Offer' },
+      { id: 'Rejected', label: 'Rejected' },
+      { id: 'No Response', label: 'No Response' },
+      { id: 'ghost', label: 'Ghost' },
+    ];
 
     return (
       <div className={`flex flex-col min-h-full px-5 pt-4 ${pageBg}`}>
@@ -342,7 +363,7 @@ function Resumes({ user }) {
               <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
             </svg>
           </button>
-          <h1 className="text-base font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark">Link to Apps</h1>
+          <h1 className="text-base font-bold text-hivio-text-primary dark:text-hivio-text-primary-dark">Link to Applications</h1>
         </div>
 
         {/* Resume badge */}
@@ -376,16 +397,16 @@ function Resumes({ user }) {
             <div className="flex gap-2 overflow-x-auto pb-1 mb-3 -mx-5 px-5" style={{ scrollbarWidth: 'none' }}>
               {STATUS_CHIPS.map((s) => (
                 <button
-                  key={s}
+                  key={s.id}
                   type="button"
-                  onClick={() => setLinkFilter(s)}
+                  onClick={() => setLinkFilter(s.id)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors duration-150 ${
-                    linkFilter === s
+                    linkFilter === s.id
                       ? 'bg-hivio-primary text-hivio-text-inverse shadow-hivio-sm'
                       : 'bg-hivio-surface dark:bg-hivio-surface-dark border border-[#C4CDD6] dark:border-hivio-border-dark text-hivio-text-secondary dark:text-hivio-text-secondary-dark hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10'
                   }`}
                 >
-                  {s === 'all' ? 'All' : s}
+                  {s.label}
                 </button>
               ))}
             </div>
@@ -397,6 +418,9 @@ function Resumes({ user }) {
               <div className="space-y-2 pb-24">
                 {filteredLinkApps.map((a) => {
                   const checked = linkSelected.has(a.id);
+                  const otherResume = a.resumeId && a.resumeId !== linkingResume.id
+                    ? resumes.find((r) => r.id === a.resumeId)
+                    : null;
                   return (
                     <button
                       key={a.id}
@@ -420,11 +444,18 @@ function Resumes({ user }) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-hivio-text-primary dark:text-hivio-text-primary-dark truncate">{a.company}</p>
                         <p className="text-xs text-hivio-text-muted dark:text-hivio-text-muted-dark truncate">{a.title}</p>
+                        {otherResume && (
+                          <p className="text-[10px] text-hivio-primary dark:text-hivio-primary truncate mt-0.5 flex items-center gap-1">
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            {otherResume.label || otherResume.fileName}
+                          </p>
+                        )}
                       </div>
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
                         a.status === 'Applied' ? 'bg-hivio-status-applied-bg text-hivio-status-applied dark:bg-hivio-status-applied-bg-dark dark:text-white'
                         : a.status === 'Interview' ? 'bg-hivio-status-interview-bg text-hivio-status-interview dark:bg-hivio-status-interview-bg-dark dark:text-white'
                         : a.status === 'Offer' ? 'bg-hivio-status-offer-bg text-hivio-status-offer dark:bg-hivio-status-offer-bg-dark dark:text-white'
+                        : a.status === 'No Response' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                         : 'bg-hivio-status-rejected-bg text-hivio-status-rejected dark:bg-hivio-status-rejected-bg-dark dark:text-white'
                       }`}>{a.status}</span>
                     </button>

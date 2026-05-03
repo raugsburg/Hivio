@@ -6,7 +6,7 @@ import { careerInterests, dashboardWidgets, DEFAULT_DASHBOARD_WIDGETS, DEFAULT_D
 import { MAJOR_ABBREVIATIONS } from '../../data/majors';
 import { SCHOOL_ABBREVIATIONS } from '../../data/schools-mn';
 import { submitFeedback, saveUserProfile, subscribeResumes } from '../../utils/db';
-import { getStoredTheme, storeTheme, applyThemeClass } from '../../utils/theme';
+import { getStoredTheme, storeTheme, applyThemeClass, resolveTheme } from '../../utils/theme';
 
 
 function normalizeText(s) {
@@ -231,7 +231,7 @@ ${recent.length > 0 ? `<div class="section"><div class="section-title">Recent Ap
   const [dragOverIdx, setDragOverIdx] = useState(null);
 
   // ---- Dark mode state + helpers ----
-  const [theme, setTheme] = useState(() => getStoredTheme());
+  const [theme, setTheme] = useState(() => resolveTheme(getStoredTheme()));
 
   useEffect(() => {
     storeTheme(theme);

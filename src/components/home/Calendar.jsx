@@ -286,7 +286,12 @@ function Calendar({ user, onNotify, onSchedule }) {
               <button
                 key={cell.key}
                 type="button"
-                onClick={() => setSelectedDate(cell.key)}
+                onClick={() => {
+                  setSelectedDate(cell.key);
+                  if (showForm && !editingId) {
+                    setForm((prev) => ({ ...prev, date: cell.key }));
+                  }
+                }}
                 className={`h-12 rounded-md border text-xs font-medium transition-colors duration-150 ease-in-out ${
                   selected
                     ? 'border-hivio-primary bg-hivio-primary-light dark:bg-hivio-primary/15 text-hivio-primary'
@@ -317,6 +322,9 @@ function Calendar({ user, onNotify, onSchedule }) {
           type="button"
           onClick={() => {
             if (editingId) { cancelEdit(); return; }
+            if (!showForm) {
+              setForm({ title: '', date: selectedDate, time: nextHourTime(), notes: '' });
+            }
             setShowForm((prev) => !prev);
             setError('');
           }}

@@ -24,8 +24,9 @@ function ProgressBar({ step }) {
   );
 }
 
-function ProfileSetup({ user, onProfileComplete }) {
+function ProfileSetup({ user, onProfileComplete, onCancel }) {
   const [step, setStep] = useState(1);
+  const [cancelling, setCancelling] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [photoError, setPhotoError] = useState('');
   const fileInputRef = useRef(null);
@@ -182,6 +183,14 @@ function ProfileSetup({ user, onProfileComplete }) {
             className="w-full text-hivio-text-muted dark:text-hivio-text-muted-dark text-sm font-medium py-2 mt-1 hover:text-hivio-text-secondary dark:hover:text-hivio-text-secondary-dark transition-colors duration-150 ease-in-out"
           >
             I'll fill this in later
+          </button>
+          <button
+            type="button"
+            disabled={cancelling}
+            onClick={async () => { setCancelling(true); await onCancel(); }}
+            className="w-full text-hivio-text-muted dark:text-hivio-text-muted-dark text-xs font-medium py-1.5 hover:text-hivio-status-rejected transition-colors duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel sign up'}
           </button>
         </div>
       </div>

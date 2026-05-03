@@ -274,6 +274,7 @@ function Applications({ user, openAppId, onOpenAppIdConsumed }) {
     const app = apps.find((a) => a.id === openAppId);
     if (app) openEdit(app);
     if (typeof onOpenAppIdConsumed === 'function') onOpenAppIdConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAppId, apps]);
 
   useEffect(() => {
@@ -351,43 +352,6 @@ function Applications({ user, openAppId, onOpenAppIdConsumed }) {
     if (!resumeId) return '';
     const r = resumes.find((x) => x.id === resumeId);
     return r ? r.label || r.fileName : 'Selected resume';
-  }
-
-  function exportToCSV() {
-    const activeApps = apps.filter((a) => !a.archived);
-    if (activeApps.length === 0) return;
-
-    const headers = ['Company', 'Job Title', 'Status', 'Date Applied', 'Follow-up Date', 'Location', 'Resume', 'Notes'];
-    const rows = activeApps.map((a) => [
-      a.company || '',
-      a.title || '',
-      a.status || '',
-      a.date || '',
-      a.followUpDate || '',
-      a.location || '',
-      resumeLabelById(a.resumeId),
-      a.notes || '',
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-
-    try {
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `hivio_applications_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setSuccess('Applications exported successfully.');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch {
-      setError('Export failed. Please try again.');
-    }
   }
 
   function openAdd() {

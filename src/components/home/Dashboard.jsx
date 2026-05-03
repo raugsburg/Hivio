@@ -44,6 +44,20 @@ function formatRelativeDate(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function appAgeInfo(app) {
+  const ts = app.createdAt
+    ? new Date(app.createdAt).getTime()
+    : app.date
+    ? new Date(`${app.date}T00:00:00`).getTime()
+    : null;
+  if (ts === null || isNaN(ts)) return { days: 0, label: '', level: 'neutral' };
+  const ms = Date.now() - ts;
+  const days = ms < 0 ? 0 : Math.floor(ms / 86400000);
+  const label = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${days}d ago`;
+  const level = days >= 21 ? 'red' : days >= 14 ? 'amber' : 'neutral';
+  return { days, label, level };
+}
+
 function ActivityBarChart({ days, values }) {
   const max = Math.max(1, ...values);
 
@@ -121,53 +135,63 @@ function StatusDistribution({ total, items, onSelect }) {
 
 function ApplicationFunnel({ total, interviewed, offer, rejected, onSelect }) {
   const rows = [
-    { id: 'All', label: 'Total Applied', value: total, color: '#6366F1' },
-    { id: 'Interview', label: 'Interview', value: interviewed, color: '#0F766E' },
-    { id: 'Offer', label: 'Offer', value: offer, color: '#D97706' },
-    { id: 'Rejected', label: 'Rejected', value: rejected, color: '#ef4444' },
+    { id: 'All', label: 'Total Applied', value: total, color: '#6366F1', navigable: true },
+    { id: 'Interview', label: 'Active Interviews', value: interviewed, color: '#0F766E', navigable: true },
+    { id: 'Offer', label: 'Offer', value: offer, color: '#D97706', navigable: true },
+    { id: 'Rejected', label: 'Rejected', value: rejected, color: '#ef4444', navigable: true },
   ];
-  // Scale all bars relative to total so proportions are honest
   const max = Math.max(1, total);
 
   return (
     <div>
-      {rows.map((r, i) => {
+      {rows.map((r) => {
         const pct = Math.round((r.value / max) * 100);
-        const prev = rows[i - 1];
         const convRate = (r.id !== 'All' && total > 0)
           ? Math.round((r.value / total) * 100)
           : null;
         const connectorLabels = {
-          Interview: `${convRate}% of applications got an interview`,
+          Interview: `${convRate}% of applications actively interviewing`,
           Offer: `${convRate}% of applications got an offer`,
           Rejected: `${convRate}% of applications were rejected`,
         };
         const connectorLabel = connectorLabels[r.id] || `${convRate}%`;
 
+        const inner = (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{r.label}</span>
+              </div>
+              <span className="text-sm font-black text-slate-800 dark:text-slate-100">{r.value}</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${r.value > 0 ? Math.max(pct, 3) : 0}%`, backgroundColor: r.color }}
+              />
+            </div>
+            {convRate !== null && (
+              <p className="text-[10px] font-semibold text-slate-400 mt-1.5">{connectorLabel}</p>
+            )}
+          </>
+        );
+
         return (
           <div key={r.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(r.id)}
-              className="w-full text-left rounded-md px-3 py-2.5 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{r.label}</span>
-                </div>
-                <span className="text-sm font-black text-slate-800 dark:text-slate-100">{r.value}</span>
+            {r.navigable ? (
+              <button
+                type="button"
+                onClick={() => onSelect(r.id)}
+                className="w-full text-left rounded-md px-3 py-2.5 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
+              >
+                {inner}
+              </button>
+            ) : (
+              <div className="w-full rounded-md px-3 py-2.5">
+                {inner}
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${r.value > 0 ? Math.max(pct, 3) : 0}%`, backgroundColor: r.color }}
-                />
-              </div>
-              {convRate !== null && (
-                <p className="text-[10px] font-semibold text-slate-400 mt-1.5">{connectorLabel}</p>
-              )}
-            </button>
+            )}
           </div>
         );
       })}
@@ -225,17 +249,24 @@ function ResumeOutcomeDonut({ data }) {
   );
 }
 
-function HealthBar({ label, score, max, color, detail }) {
+function HealthBar({ label, score, max, color, detail, pts }) {
   const pct = Math.round((score / max) * 100);
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300">{detail}</span>
+        {pts ? (
+          <span className="text-[10px] font-bold tabular-nums" style={{ color }}>{score} / {max} pts</span>
+        ) : (
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300">{detail}</span>
+        )}
       </div>
       <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
+      {pts && detail && (
+        <p className="text-[9px] text-slate-400 mt-1">{detail}</p>
+      )}
     </div>
   );
 }
@@ -342,14 +373,14 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
     resumePerformance: true,
     upcomingTasks: true,
     recentApps: true,
-    rejectionRate: false,
     ...(user.dashboardWidgets || {}),
     // These widgets have been removed — always off regardless of saved prefs
     weeklyGoal: false,
     statusBreakdown: false,
+    rejectionRate: false,
   };
 
-  const REMOVED_WIDGETS = ['weeklyGoal', 'statusBreakdown'];
+  const REMOVED_WIDGETS = ['weeklyGoal', 'statusBreakdown', 'rejectionRate'];
   const dashboardOrder = (user.dashboardOrder || DEFAULT_DASHBOARD_ORDER).filter(
     (id) => !REMOVED_WIDGETS.includes(id)
   );
@@ -860,15 +891,15 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
 
         <div className="grid grid-cols-3 gap-2 mt-4">
           <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
-            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Interview</p>
-            <p className="text-lg font-black text-teal-700 dark:text-teal-300">{interviewRate}%</p>
+            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Total<br />Interviews</p>
+            <p className="text-lg font-black text-teal-700 dark:text-teal-300">{interviewsLanded}</p>
           </div>
           <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
             <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Offers</p>
             <p className="text-lg font-black text-amber-700 dark:text-amber-300">{offerCount}</p>
           </div>
           <div className="rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark p-3">
-            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">This Week</p>
+            <p className="h-7 text-[10px] uppercase tracking-wide font-bold text-slate-400 leading-tight">Applied<br />This Week</p>
             <p className="text-lg font-black text-hivio-primary">
               {thisWeekCount}
               <span className="text-[11px] font-semibold text-slate-400"> / {weeklyGoalTarget}</span>
@@ -939,19 +970,13 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
         if (widgetId === 'applicationFunnel' && widgets.applicationFunnel) {
           return (
             <div key="applicationFunnel" className="bg-hivio-surface dark:bg-hivio-surface-dark rounded-lg p-5 shadow-hivio border border-[#C4CDD6] dark:border-hivio-border-dark mb-4">
-              <div className="flex items-start justify-between gap-4 mb-3">
-                <div>
-                  <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
-                    Application Funnel
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Ratio from applied to interview to offer.
-                  </p>
-                </div>
-                <div className="rounded-md border border-hivio-border dark:border-hivio-border-dark px-3 py-2 bg-hivio-bg dark:bg-hivio-bg-dark">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Interviews Landed</p>
-                  <p className="text-lg font-black text-teal-700 dark:text-teal-300 leading-none mt-1">{interviewsLanded}</p>
-                </div>
+              <div className="mb-3">
+                <h2 className="text-sm font-extrabold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
+                  Application Funnel
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Where your applications stand right now.
+                </p>
               </div>
               <ApplicationFunnel
                 total={counts.total}
@@ -960,16 +985,6 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                 rejected={rejectedCount}
                 onSelect={navigateToApplicationsWithStatus}
               />
-              {counts.total >= 5 && (
-                <div className="mt-3 px-3 py-2 rounded-md bg-hivio-bg dark:bg-hivio-bg-dark border border-hivio-border dark:border-hivio-border-dark">
-                  <span className={`text-xs font-bold block ${interviewRate >= 8 ? 'text-teal-600 dark:text-teal-300' : interviewRate >= 4 ? 'text-amber-600 dark:text-amber-300' : 'text-slate-500 dark:text-slate-300'}`}>
-                    {interviewRate >= 8 ? 'Above average interview rate' : interviewRate >= 4 ? 'Near average interview rate' : 'Below average interview rate'}
-                  </span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">
-                    {interviewRate >= 8 ? 'You\'re outperforming the typical 3–5% new-grad rate.' : interviewRate >= 4 ? 'Typical new-grad rate is 3–5% — you\'re close.' : 'Typical new-grad rate is 3–5% — focus on tailoring.'}
-                  </span>
-                </div>
-              )}
             </div>
           );
         }
@@ -999,7 +1014,7 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
               <ActivityBarChart days={last7} values={activityValues} />
               {activityValues.reduce((a, b) => a + b, 0) === 0 && (
                 <p className="text-xs text-slate-400 mt-2 text-center">
-                  No activity yet — start applying!
+                  No applications this week{rollingWeeklyAvg > 0 ? ` · ${rollingWeeklyAvg.toFixed(1)} avg over last 4 weeks` : ''}
                 </p>
               )}
             </div>
@@ -1111,20 +1126,24 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wide text-[#e87c7c] mb-1.5">Overdue</p>
                       <div className="space-y-2">
-                        {overdueFollowups.map((a) => (
-                          <button key={a.id} type="button" onClick={() => navigateToApp(a.id)} className="w-full text-left flex items-start justify-between gap-3 border border-[#5a2a2a] rounded-md p-3 bg-[#2a1515] dark:bg-[#2a1515] hover:opacity-80 transition-opacity duration-150">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-100 truncate">{a.title}</p>
-                              <p className="text-xs text-slate-400 font-medium truncate mt-0.5">{a.company}</p>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <p className="text-xs font-semibold text-[#e87c7c]">{formatRelativeDate(a.followUpDate)}</p>
-                              <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold mt-1 ${statusBadgeClasses(a.status)}`}>
-                                {a.status}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
+                        {overdueFollowups.map((a) => {
+                          const daysOverdue = Math.floor((Date.now() - new Date(`${a.followUpDate}T00:00:00`).getTime()) / 86400000);
+                          const overdueLabel = daysOverdue === 1 ? '1 day overdue' : `${daysOverdue} days overdue`;
+                          return (
+                            <button key={a.id} type="button" onClick={() => navigateToApp(a.id)} className="w-full text-left flex items-start justify-between gap-3 border border-red-200 dark:border-red-900 rounded-md p-3 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 transition-colors duration-150">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{a.company}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-xs font-semibold text-[#e87c7c]">{overdueLabel}</p>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold mt-1 ${statusBadgeClasses(a.status)}`}>
+                                  {a.status}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1189,27 +1208,35 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {recentApps.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => navigateToApp(a.id)}
-                      className="w-full text-left flex items-start justify-between gap-3 border border-hivio-border dark:border-hivio-border-dark rounded-md p-3 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-300 font-medium truncate mt-0.5">
-                          {a.company}{a.location ? ` • ${a.location}` : ''}{a.resumeId ? ` • ${resumeLabelById(a.resumeId)}` : ''}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold ${statusBadgeClasses(a.status)}`}>
-                          {a.status}
-                        </span>
-                        <p className="text-[11px] text-slate-400 font-medium mt-1">{formatRelativeDate(a.date)}</p>
-                      </div>
-                    </button>
-                  ))}
+                  {recentApps.map((a) => {
+                    const age = appAgeInfo(a);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => navigateToApp(a.id)}
+                        className="w-full text-left flex items-start justify-between gap-3 border border-hivio-border dark:border-hivio-border-dark rounded-md p-3 hover:bg-hivio-primary-ghost dark:hover:bg-hivio-primary/10 transition-colors duration-150"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-300 font-medium truncate mt-0.5">
+                            {a.company}{a.location ? ` • ${a.location}` : ''}{a.resumeId ? ` • ${resumeLabelById(a.resumeId)}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold ${statusBadgeClasses(a.status)}`}>
+                            {a.status}
+                          </span>
+                          <p className={`text-[11px] font-medium mt-1 flex items-center justify-end gap-1 ${age.level === 'red' ? 'text-red-400' : age.level === 'amber' ? 'text-amber-400' : 'text-slate-400'}`}>
+                            {age.level !== 'neutral' && (
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${age.level === 'red' ? 'bg-red-400' : 'bg-amber-400'}`} />
+                            )}
+                            {age.label}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1256,12 +1283,25 @@ function Dashboard({ user, onTabChange, onOpenApp }) {
                   </div>
                   <div className="space-y-3">
                     <HealthBar label="Activity" score={healthActivity} max={30} color="#6366F1"
-                      detail={`${rollingWeeklyAvg.toFixed(1)} avg/week · goal ${weeklyGoalTarget}`} />
-                    <HealthBar label="Conversion" score={interviewRate} max={100} color="#0F766E"
-                      detail={`${interviewRate}% interview rate`} />
+                      detail={`${rollingWeeklyAvg.toFixed(1)} avg/week · goal ${weeklyGoalTarget}`} pts />
+                    <HealthBar label="Conversion" score={healthConversion} max={40} color="#0F766E"
+                      detail={`${interviewRate}% interview rate`} pts />
                     <HealthBar label="Follow-up Discipline" score={healthCoverage} max={30} color="#D97706"
-                      detail={`${Math.round(followUpCoverage * 100)}% of active apps covered`} />
+                      detail={`${Math.round(followUpCoverage * 100)}% of active apps covered`} pts />
                   </div>
+                  {ghostPenalty > 0 && (
+                    <button
+                      type="button"
+                      onClick={navigateToGhostApps}
+                      className="mt-4 w-full flex items-center justify-between rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 px-3 py-2.5 hover:bg-red-100 dark:hover:bg-red-900 transition-colors duration-150"
+                    >
+                      <div className="text-left">
+                        <p className="text-[11px] font-bold text-red-500 dark:text-red-400">Resolve ghost apps</p>
+                        <p className="text-[10px] text-red-400 dark:text-red-500 mt-0.5">{ghostCount} app{ghostCount !== 1 ? 's' : ''} with no follow-up · recover up to {ghostPenalty} pts</p>
+                      </div>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-400 flex-shrink-0"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  )}
                 </>
               )}
             </div>
